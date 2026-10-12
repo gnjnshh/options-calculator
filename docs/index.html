@@ -580,6 +580,17 @@
             </div>
             <input type="number" id="ctrlSpot" step="0.5" value="1047.00" oninput="syncManualSpot(this.value)">
             <input type="range" id="spotSlider" min="200" max="3000" step="1" value="1047" oninput="syncManualSpot(this.value)">
+            <!-- Spot Quick Scenarios -->
+            <div style="display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; align-items: center;">
+              <span style="font-size: 10px; color: var(--text-muted); font-weight: 700; margin-right: 2px;">SPOT:</span>
+              <button type="button" class="chip" onclick="shiftSpotPct(-5)">-5%</button>
+              <button type="button" class="chip" onclick="shiftSpotPct(-2)" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); font-weight: 700;">-2% Tomorrow</button>
+              <button type="button" class="chip" onclick="shiftSpotPct(-1)">-1%</button>
+              <button type="button" class="chip" onclick="resetLiveSpot()" style="color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); font-weight: 600;">Reset Live</button>
+              <button type="button" class="chip" onclick="shiftSpotPct(1)">+1%</button>
+              <button type="button" class="chip" onclick="shiftSpotPct(2)">+2%</button>
+              <button type="button" class="chip" onclick="shiftSpotPct(5)">+5%</button>
+            </div>
           </div>
 
           <div class="form-group">
@@ -597,6 +608,14 @@
               <span id="dteTxt" class="val">15.0 days</span>
             </div>
             <input type="number" id="ctrlDte" value="15.0" step="0.5" oninput="syncManualDte(this.value)">
+            <!-- DTE Quick Scenarios -->
+            <div style="display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; align-items: center;">
+              <span style="font-size: 10px; color: var(--text-muted); font-weight: 700; margin-right: 2px;">TIME:</span>
+              <button type="button" class="chip" onclick="shiftDteDays(-1)" style="color: #a78bfa; border-color: rgba(167, 139, 250, 0.4); font-weight: 700;">📅 Tomorrow (-1d)</button>
+              <button type="button" class="chip" onclick="shiftDteDays(-3)">-3 Days</button>
+              <button type="button" class="chip" onclick="setDteDays(0)">🏁 Expiry (0d)</button>
+              <button type="button" class="chip" onclick="resetLiveDte()" style="color: #60a5fa; border-color: rgba(59, 130, 246, 0.4);">Reset DTE</button>
+            </div>
           </div>
         </div>
       </div>
@@ -619,20 +638,24 @@
 
           <div class="pos-stats">
             <div class="pos-stat-item">
-              <span class="pos-stat-label">Live Spot Price</span>
+              <span class="pos-stat-label" id="lblDispSpot">Live Spot Price</span>
               <span class="pos-stat-val" id="dispSpot">₹1,047.00</span>
+              <div style="font-size: 10px; color: #34d399; margin-top: 2px;" id="dispSpotSub">Direct Market</div>
             </div>
             <div class="pos-stat-item">
-              <span class="pos-stat-label">Market LTP</span>
-              <span class="pos-stat-val" style="color: #fbbf24;" id="dispLtp">₹3.50</span>
+              <span class="pos-stat-label" id="lblDispLtp">Market LTP</span>
+              <span class="pos-stat-val" style="color: #fbbf24;" id="dispLtp">₹2.00</span>
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;" id="dispLtpSub">Traded Quote</div>
             </div>
             <div class="pos-stat-item">
               <span class="pos-stat-label">Entry Avg</span>
               <span class="pos-stat-val" id="dispEntry">₹2.00</span>
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Your Sold Avg</div>
             </div>
             <div class="pos-stat-item">
-              <span class="pos-stat-label">Unrealized P&L</span>
-              <span class="pos-stat-val" id="dispPnl" style="color: #f87171;">-₹525.00</span>
+              <span class="pos-stat-label" id="lblDispPnl">Unrealized P&L</span>
+              <span class="pos-stat-val" id="dispPnl" style="color: #34d399;">₹0.00</span>
+              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;" id="dispPnlSub">Current P&L</div>
             </div>
           </div>
         </div>
@@ -804,6 +827,22 @@
     function normCdf(x) { return 0.5 * (1.0 + erf(x / Math.SQRT2)); }
     function normPdf(x) { return Math.exp(-0.5 * x * x) / Math.sqrt(2.0 * Math.PI); }
 
+    // Black-Scholes Theoretical Option Pricing
+    function blackScholesPrice(s, k, tYears, r, iv, optType) {
+      if (tYears <= 1e-4) {
+        return (optType === 'put') ? Math.max(0, k - s) : Math.max(0, s - k);
+      }
+      const v = Math.max(1e-4, iv * Math.sqrt(tYears));
+      const d1 = (Math.log(s / k) + (r + 0.5 * iv * iv) * tYears) / v;
+      const d2 = d1 - v;
+      const df = Math.exp(-r * tYears);
+      if (optType === 'call') {
+        return Math.max(0, s * normCdf(d1) - k * df * normCdf(d2));
+      } else {
+        return Math.max(0, k * df * normCdf(-d2) - s * normCdf(-d1));
+      }
+    }
+
     // Active Upstox Bearer Token (Pre-loaded so it always syncs live automatically)
     const DEFAULT_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3NUJXTTQiLCJqdGkiOiI2YWNjYWVkZWQ1Y2UyZjZjZDAyYzcxMGIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc5MTc5OTAwNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODIzMzc4NDAwfQ.IjmWM58FA0PRtUW-tWJQI3EXEWp8cTJ52PxKOd5DhbU";
 
@@ -830,7 +869,12 @@
       dte: 15.0,
       rate: 0.0675,
       ltp: 13.90,
-      token: DEFAULT_TOKEN
+      token: DEFAULT_TOKEN,
+      // Baseline live values saved upon API fetch for dynamic delta P&L simulation
+      liveSpot: 1158.90,
+      liveLtp: 13.90,
+      liveDte: 15.0,
+      liveIv: 0.249
     };
 
     // Recent Trades Memory (Last 5)
@@ -997,6 +1041,18 @@
       recalc();
     }
 
+    function shiftSpotPct(pct) {
+      const base = state.liveSpot || state.spot;
+      const newSpot = Number((base * (1.0 + pct / 100.0)).toFixed(2));
+      syncManualSpot(newSpot);
+    }
+
+    function resetLiveSpot() {
+      if (state.liveSpot) {
+        syncManualSpot(state.liveSpot);
+      }
+    }
+
     function syncManualIv(val) {
       state.iv = parseFloat(val) / 100.0;
       document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
@@ -1005,9 +1061,25 @@
     }
 
     function syncManualDte(val) {
-      state.dte = Math.max(0.1, parseFloat(val));
-      document.getElementById("ctrlDte").value = state.dte;
+      state.dte = Math.max(0.0, parseFloat(val));
+      document.getElementById("ctrlDte").value = state.dte.toFixed(1);
       recalc();
+    }
+
+    function shiftDteDays(delta) {
+      const base = state.dte;
+      const newDte = Math.max(0.0, Number((base + delta).toFixed(1)));
+      syncManualDte(newDte);
+    }
+
+    function setDteDays(d) {
+      syncManualDte(d);
+    }
+
+    function resetLiveDte() {
+      if (state.liveDte) {
+        syncManualDte(state.liveDte);
+      }
     }
 
     // Direct Upstox API Fetching (Works on both GitHub Pages & Localhost)
@@ -1114,6 +1186,7 @@
     function applyMarketData(m, forceSpotUpdate = true) {
       if (m.spot && (forceSpotUpdate || !state.spot)) {
         state.spot = m.spot;
+        state.liveSpot = m.spot;
         document.getElementById("ctrlSpot").value = state.spot;
         document.getElementById("spotSlider").value = state.spot;
         document.getElementById("spotSlider").min = Math.round(state.spot * 0.4);
@@ -1121,14 +1194,17 @@
       }
       if (m.ltp !== undefined && m.ltp !== null) {
         state.ltp = m.ltp;
+        state.liveLtp = m.ltp;
       }
       if (m.iv) {
         state.iv = m.iv / 100.0;
+        state.liveIv = state.iv;
         document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
         document.getElementById("ivSlider").value = (state.iv * 100).toFixed(1);
       }
       if (m.dte_days) {
         state.dte = m.dte_days;
+        state.liveDte = m.dte_days;
         document.getElementById("ctrlDte").value = state.dte.toFixed(1);
       }
       if (m.lot_size) {
@@ -1180,6 +1256,42 @@
       let thetaLot = thetaDaily * state.lotSize * (state.isShort ? -1 : 1);
       let vega = (state.spot * Math.sqrt(t) * pdfD1) / 100.0;
 
+      // Dynamic Black-Scholes Option Price & Unrealized P&L Simulation
+      const tLive = Math.max(1e-4, (state.liveDte || state.dte) / 365.0);
+      const sLive = state.liveSpot || state.spot;
+      const ivLive = state.liveIv || state.iv;
+      const baseLtp = (state.liveLtp !== undefined && state.liveLtp !== null) ? state.liveLtp : state.ltp;
+
+      // Price changes relative to live baseline
+      const vBase = blackScholesPrice(sLive, state.strike, tLive, state.rate, ivLive, state.optionType);
+      const vSim = blackScholesPrice(state.spot, state.strike, t, state.rate, state.iv, state.optionType);
+
+      const isSimulated = Math.abs(state.spot - sLive) > 0.05 || Math.abs(state.dte - (state.liveDte || state.dte)) > 0.05 || Math.abs(state.iv - ivLive) > 0.005;
+
+      let estLtp = baseLtp;
+      if (isSimulated) {
+        if (state.dte <= 0.01) {
+          // At exact expiration (0 DTE), option value equals intrinsic value
+          estLtp = (state.optionType === 'put') ? Math.max(0, state.strike - state.spot) : Math.max(0, state.spot - state.strike);
+        } else {
+          // Dynamic Black-Scholes non-linear price adjustment
+          const deltaV = vSim - vBase;
+          estLtp = Math.max(0.05, baseLtp + deltaV);
+        }
+      }
+      state.ltp = estLtp;
+
+      // P&L calculation
+      const pnl = state.isShort 
+        ? (state.price - estLtp) * state.lotSize 
+        : (estLtp - state.price) * state.lotSize;
+
+      const livePnl = state.isShort
+        ? (state.price - baseLtp) * state.lotSize
+        : (baseLtp - state.price) * state.lotSize;
+
+      const diffPnl = pnl - livePnl;
+
       // Header Banner UI
       document.getElementById("dispContractTag").innerText = `${state.symbol} ${state.strike} ${state.optionType.toUpperCase()}`;
       document.getElementById("dispPositionBadge").innerText = `${state.isShort ? 'SHORT' : 'LONG'} (1 Lot / ${state.lotSize} Qty)`;
@@ -1192,16 +1304,63 @@
         ? `Spot is ₹${Math.abs(bufferPts).toFixed(2)} (${Math.abs(bufferPct).toFixed(2)}%) away from strike • Out-Of-The-Money (OTM)`
         : `Spot is ₹${Math.abs(bufferPts).toFixed(2)} (${Math.abs(bufferPct).toFixed(2)}%) ITM • In-The-Money`;
 
+      // Update Spot display & subtext
       document.getElementById("dispSpot").innerText = `₹${state.spot.toFixed(2)}`;
-      document.getElementById("dispLtp").innerText = `₹${state.ltp.toFixed(2)}`;
+      const spotPctDiff = sLive > 0 ? ((state.spot - sLive) / sLive) * 100 : 0;
+      const spotSubEl = document.getElementById("dispSpotSub");
+      const lblSpotEl = document.getElementById("lblDispSpot");
+      if (isSimulated && Math.abs(spotPctDiff) > 0.05) {
+        if (lblSpotEl) lblSpotEl.innerHTML = `Simulated Spot <span style="color:${spotPctDiff >= 0 ? '#34d399' : '#f87171'}; font-weight:700;">(${spotPctDiff >= 0 ? '+' : ''}${spotPctDiff.toFixed(2)}%)</span>`;
+        if (spotSubEl) spotSubEl.innerText = `Live: ₹${sLive.toFixed(2)}`;
+      } else {
+        if (lblSpotEl) lblSpotEl.innerText = "Live Spot Price";
+        if (spotSubEl) spotSubEl.innerText = "Direct Market";
+      }
+
+      // Update LTP display & subtext
+      document.getElementById("dispLtp").innerText = `₹${estLtp.toFixed(2)}`;
+      const lblLtpEl = document.getElementById("lblDispLtp");
+      const ltpSubEl = document.getElementById("dispLtpSub");
+      if (isSimulated) {
+        if (lblLtpEl) lblLtpEl.innerText = "Est. Option LTP";
+        const ltpDiff = estLtp - baseLtp;
+        if (ltpSubEl) {
+          ltpSubEl.innerText = `Live: ₹${baseLtp.toFixed(2)} (${ltpDiff >= 0 ? '+' : ''}₹${ltpDiff.toFixed(2)})`;
+          ltpSubEl.style.color = '#fbbf24';
+        }
+      } else {
+        if (lblLtpEl) lblLtpEl.innerText = "Market LTP";
+        if (ltpSubEl) {
+          ltpSubEl.innerText = "Traded Quote";
+          ltpSubEl.style.color = "var(--text-muted)";
+        }
+      }
+
+      // Entry
       document.getElementById("dispEntry").innerText = `₹${state.price.toFixed(2)}`;
 
-      const pnl = state.isShort 
-        ? (state.price - state.ltp) * state.lotSize 
-        : (state.ltp - state.price) * state.lotSize;
+      // Update P&L display & subtext
       const pnlEl = document.getElementById("dispPnl");
       pnlEl.innerText = `${pnl >= 0 ? '+' : ''}₹${pnl.toFixed(2)}`;
       pnlEl.style.color = pnl >= 0 ? '#34d399' : '#f87171';
+
+      const lblPnlEl = document.getElementById("lblDispPnl");
+      const pnlSubEl = document.getElementById("dispPnlSub");
+      if (isSimulated) {
+        if (lblPnlEl) lblPnlEl.innerText = "Simulated P&L";
+        if (pnlSubEl) {
+          pnlSubEl.innerText = `Δ ${diffPnl >= 0 ? '+' : ''}₹${diffPnl.toFixed(2)} vs Today`;
+          pnlSubEl.style.color = diffPnl >= 0 ? '#34d399' : '#f87171';
+          pnlSubEl.style.fontWeight = '600';
+        }
+      } else {
+        if (lblPnlEl) lblPnlEl.innerText = "Unrealized P&L";
+        if (pnlSubEl) {
+          pnlSubEl.innerText = "Current P&L";
+          pnlSubEl.style.color = "var(--text-muted)";
+          pnlSubEl.style.fontWeight = 'normal';
+        }
+      }
 
       // Labels
       document.getElementById("strikeTxt").innerText = `₹${state.strike.toFixed(2)}`;
