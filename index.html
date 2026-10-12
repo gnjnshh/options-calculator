@@ -782,6 +782,9 @@
     function normCdf(x) { return 0.5 * (1.0 + erf(x / Math.SQRT2)); }
     function normPdf(x) { return Math.exp(-0.5 * x * x) / Math.sqrt(2.0 * Math.PI); }
 
+    // Active Upstox Bearer Token (Pre-loaded so it always syncs live automatically)
+    const DEFAULT_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3NUJXTTQiLCJqdGkiOiI2YWNjYWVkZWQ1Y2UyZjZjZDAyYzcxMGIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc5MTc5OTAwNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODIzMzc4NDAwfQ.IjmWM58FA0PRtUW-tWJQI3EXEWp8cTJ52PxKOd5DhbU";
+
     // Fallback FNO map if js file didn't load
     const FNO = (typeof FNO_INSTRUMENTS !== 'undefined') ? FNO_INSTRUMENTS : {
       "RELIANCE": { "instrument_key": "NSE_EQ|INE002A01018", "lot_size": 500 },
@@ -794,18 +797,18 @@
 
     // State
     const state = {
-      symbol: "POLICYBZR",
-      strike: 860.0,
+      symbol: "RELIANCE",
+      strike: 1140.0,
       optionType: "put",
       isShort: true,
-      price: 2.0,
-      lotSize: 350,
-      spot: 1047.00,
-      iv: 0.647,
+      price: 3.35,
+      lotSize: 500,
+      spot: 1158.90,
+      iv: 0.249,
       dte: 15.0,
       rate: 0.0675,
-      ltp: 3.50,
-      token: ""
+      ltp: 13.90,
+      token: DEFAULT_TOKEN
     };
 
     // Recent Trades Memory (Last 5)
@@ -986,12 +989,12 @@
     }
 
     // Direct Upstox API Fetching (Works on both GitHub Pages & Localhost)
-    async function fetchLiveMarket() {
+    async function fetchLiveMarket(forceSpotUpdate = true) {
       const sym = state.symbol.toUpperCase();
       const strike = parseFloat(document.getElementById("ctrlStrike").value) || state.strike;
       state.strike = strike;
       const optType = state.optionType;
-      const token = state.token || localStorage.getItem("upstox_token");
+      const token = localStorage.getItem("upstox_token") || state.token || DEFAULT_TOKEN;
       const statusEl = document.getElementById("fetchStatus");
 
       statusEl.innerText = `Fetching ${sym} live data...`;
@@ -1003,8 +1006,8 @@
         if (resp.ok) {
           const data = await resp.json();
           if (data.status === 'success') {
-            applyMarketData(data.market);
-            statusEl.innerText = `Live Connected (Local)`;
+            applyMarketData(data.market, forceSpotUpdate);
+            statusEl.innerText = `Live Connected (Local Server)`;
             statusEl.className = "";
             return;
           }
@@ -1014,13 +1017,6 @@
       }
 
       // 2. Direct client-side Upstox API call
-      if (!token) {
-        statusEl.innerText = "Offline (Enter Token in Settings to Sync Live)";
-        statusEl.className = "";
-        recalc();
-        return;
-      }
-
       try {
         const fnoInfo = FNO[sym];
         const instKey = fnoInfo ? fnoInfo.instrument_key : `NSE_EQ|${sym}`;
@@ -1035,10 +1031,18 @@
         const contracts = expData.data || [];
         const expiries = Array.from(new Set(contracts.map(c => c.expiry))).sort();
 
+        // Match selected expiry or target expiry if available
+        let currentSelectedExp = document.getElementById("ctrlExpiry").value;
         let expiryDate = expiries[0] || "2026-10-27";
+        if (currentSelectedExp && expiries.includes(currentSelectedExp)) {
+          expiryDate = currentSelectedExp;
+        } else if (expiries.includes("2026-10-27")) {
+          expiryDate = "2026-10-27";
+        }
+
         // Populate expiry dropdown
         const expSelect = document.getElementById("ctrlExpiry");
-        expSelect.innerHTML = expiries.slice(0, 5).map(e => `<option value="${e}" ${e === expiryDate ? 'selected' : ''}>${e}</option>`).join("");
+        expSelect.innerHTML = expiries.slice(0, 8).map(e => `<option value="${e}" ${e === expiryDate ? 'selected' : ''}>${e}</option>`).join("");
 
         // Fetch option chain
         const chainResp = await fetch(`https://api.upstox.com/v2/option/chain?instrument_key=${encodeURIComponent(instKey)}&expiry_date=${expiryDate}`, { headers });
@@ -1048,7 +1052,6 @@
         // Find target strike
         let target = chain.find(c => Math.abs(c.strike_price - strike) < 0.1);
         if (!target && chain.length > 0) {
-          // If strike not exact match, pick closest
           target = chain.reduce((prev, curr) => Math.abs(curr.strike_price - strike) < Math.abs(prev.strike_price - strike) ? curr : prev);
         }
 
@@ -1065,13 +1068,13 @@
 
           applyMarketData({
             spot: spot,
-            ltp: mkt.ltp || state.ltp,
+            ltp: mkt.ltp,
             iv: greeks.iv,
             dte_days: dteDays,
             lot_size: fnoInfo ? fnoInfo.lot_size : state.lotSize
-          });
+          }, forceSpotUpdate);
 
-          statusEl.innerText = `Live Connected (Direct Upstox API)`;
+          statusEl.innerText = `Live Connected (Spot: ₹${spot.toFixed(2)} | LTP: ₹${(mkt.ltp || state.ltp).toFixed(2)})`;
           statusEl.className = "";
         } else {
           statusEl.innerText = `Strike ${strike} not in chain`;
@@ -1086,22 +1089,30 @@
       }
     }
 
-    function applyMarketData(m) {
-      if (m.spot) state.spot = m.spot;
-      if (m.ltp !== undefined && m.ltp !== null) state.ltp = m.ltp;
-      if (m.iv) state.iv = m.iv / 100.0;
-      if (m.dte_days) state.dte = m.dte_days;
-      if (m.lot_size) state.lotSize = m.lot_size;
-
-      document.getElementById("ctrlSpot").value = state.spot;
-      document.getElementById("spotSlider").value = state.spot;
-      document.getElementById("spotSlider").min = Math.round(state.spot * 0.4);
-      document.getElementById("spotSlider").max = Math.round(state.spot * 1.8);
-
-      document.getElementById("ctrlDte").value = state.dte.toFixed(1);
-      document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
-      document.getElementById("ivSlider").value = (state.iv * 100).toFixed(1);
-      document.getElementById("ctrlLotSize").value = state.lotSize;
+    function applyMarketData(m, forceSpotUpdate = true) {
+      if (m.spot && (forceSpotUpdate || !state.spot)) {
+        state.spot = m.spot;
+        document.getElementById("ctrlSpot").value = state.spot;
+        document.getElementById("spotSlider").value = state.spot;
+        document.getElementById("spotSlider").min = Math.round(state.spot * 0.4);
+        document.getElementById("spotSlider").max = Math.round(state.spot * 1.8);
+      }
+      if (m.ltp !== undefined && m.ltp !== null) {
+        state.ltp = m.ltp;
+      }
+      if (m.iv) {
+        state.iv = m.iv / 100.0;
+        document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
+        document.getElementById("ivSlider").value = (state.iv * 100).toFixed(1);
+      }
+      if (m.dte_days) {
+        state.dte = m.dte_days;
+        document.getElementById("ctrlDte").value = state.dte.toFixed(1);
+      }
+      if (m.lot_size) {
+        state.lotSize = m.lot_size;
+        document.getElementById("ctrlLotSize").value = state.lotSize;
+      }
 
       recalc();
     }
