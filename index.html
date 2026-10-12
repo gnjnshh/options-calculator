@@ -80,8 +80,13 @@
       color: #60a5fa;
       border: 1px solid rgba(59, 130, 246, 0.3);
     }
+    .badge-amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
 
-    /* Natural Language Quick Search Bar */
+    /* Exact Ticker Search Bar */
     .nl-search-card {
       background: linear-gradient(135deg, #131d33, #0f172a);
       border: 1px solid #2d3e63;
@@ -104,7 +109,9 @@
       padding: 10px 14px;
       color: #fff;
       font-size: 14px;
-      font-family: inherit;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
     .nl-input:focus {
       outline: none;
@@ -128,26 +135,49 @@
     }
     .btn-action:hover { background: var(--primary-hover); }
 
-    .quick-chips {
+    /* Recent Trades Chips */
+    .recent-trades-container {
+      margin-top: 12px;
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
       gap: 8px;
-      margin-top: 10px;
+    }
+    .recent-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     .chip {
       background: #1e293b;
       border: 1px solid #334155;
-      color: #94a3b8;
-      padding: 4px 10px;
+      color: #cbd5e1;
+      padding: 5px 12px;
       border-radius: 6px;
       font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .chip:hover {
-      background: #334155;
+      background: #27354f;
+      border-color: #3b82f6;
       color: #fff;
     }
+    .chip b { color: #60a5fa; }
+    .chip-del {
+      color: #64748b;
+      font-weight: bold;
+      font-size: 12px;
+      margin-left: 2px;
+    }
+    .chip-del:hover { color: #f87171; }
 
     /* Grid Layout */
     .dashboard-grid {
@@ -390,7 +420,7 @@
     .chart-container {
       position: relative;
       width: 100%;
-      height: 320px;
+      height: 340px;
       background: #0c1220;
       border: 1px solid #1e293b;
       border-radius: 10px;
@@ -417,6 +447,14 @@
       max-width: 500px;
       width: 90%;
     }
+
+    .loading-pulse {
+      animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
   </style>
 </head>
 <body>
@@ -425,47 +463,46 @@
     <header>
       <div>
         <div class="header-title">
-          <span>⚡</span> Options Probability & Expiration Analytics
+          <span>⚡</span> Options Probability & Risk Analytics Dashboard
         </div>
         <div class="header-sub">
-          Instant Black-Scholes analysis with live Upstox API feed & exact lognormal probabilities
+          Universal multi-stock Black-Scholes analytics with direct live Upstox API feed
         </div>
       </div>
       <div style="display: flex; gap: 8px; align-items: center;">
         <button class="btn-action" style="background: #1e293b; border: 1px solid #334155;" onclick="openTokenModal()">
           🔑 API Token Settings
         </button>
-        <span class="badge badge-green" id="tokenBadge">Upstox Connected</span>
+        <span class="badge badge-green" id="tokenBadge">Live Mode</span>
       </div>
     </header>
 
     <!-- Exact Ticker Input Bar -->
     <div class="nl-search-card">
       <div style="font-size: 12px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center;">
-        <span>🎯 Exact Contract Ticker (Format: SYMBOL EXPIRY STRIKE TYPE)</span>
-        <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">No AI parsing required &bull; 100% Deterministic</span>
+        <span>🎯 Exact Contract Ticker (Format: SYMBOL EXPIRY STRIKE TYPE [STANCE] [PRICE])</span>
+        <span id="fetchStatus" style="font-size: 11px; color: #34d399; font-weight: 600;">Ready</span>
       </div>
       <div class="nl-input-row">
         <input 
           type="text" 
-          id="nlInput" 
+          id="tickerInput" 
           class="nl-input" 
-          placeholder="e.g. RELIANCE 27 OCT 1140 PUT  or  RELIANCE 27 OCT 1140 PUT SHORT 3.35"
-          value="RELIANCE 27 OCT 1140 PUT SHORT 3.35"
-          onkeydown="if(event.key==='Enter') executeExactTickerSearch()"
-          style="font-family: var(--font-mono); font-weight: 700; letter-spacing: 0.02em;"
+          placeholder="e.g. POLICYBZR 27 OCT 860 PUT SHORT 2.0  or  RELIANCE 27 OCT 1140 PUT SHORT 3.35"
+          value="POLICYBZR 27 OCT 860 PUT SHORT 2.0"
+          onkeydown="if(event.key==='Enter') executeTickerSearch()"
         >
-        <button class="btn-action" onclick="executeExactTickerSearch()">
+        <button class="btn-action" onclick="executeTickerSearch()" id="btnAnalyze">
           ⚡ Analyze Ticker
         </button>
       </div>
-      <div class="quick-chips">
-        <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Quick Tickers:</span>
-        <button class="chip" onclick="applyTickerPreset('RELIANCE 27 OCT 1140 PUT SHORT 3.35')"><b>RELIANCE 27 OCT</b> 1140 PUT (Your Trade)</button>
-        <button class="chip" onclick="applyTickerPreset('NIFTY 27 OCT 22400 CE')"><b>NIFTY 27 OCT</b> 22400 CE</button>
-        <button class="chip" onclick="applyTickerPreset('BANKNIFTY 27 OCT 48000 PE')"><b>BANKNIFTY 27 OCT</b> 48000 PE</button>
-        <button class="chip" onclick="applyTickerPreset('TCS 27 OCT 3900 PE')"><b>TCS 27 OCT</b> 3900 PE</button>
-        <button class="chip" onclick="applyTickerPreset('INFY 27 OCT 1500 CE')"><b>INFY 27 OCT</b> 1500 CE</button>
+
+      <!-- Remembered Last 5 Trades -->
+      <div class="recent-trades-container">
+        <span class="recent-label">🕒 Recent Trades (Last 5):</span>
+        <div id="recentChips" style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <!-- Dynamically populated from localStorage -->
+        </div>
       </div>
     </div>
 
@@ -477,25 +514,14 @@
           <div class="card-title">
             <span>Contract Parameters</span>
             <button class="chip" onclick="fetchLiveMarket()" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4);">
-              🔄 Refresh Upstox
+              🔄 Refresh Market
             </button>
           </div>
 
           <!-- Symbol & Expiry -->
           <div class="form-group">
-            <label class="form-label">Symbol</label>
-            <select id="ctrlSymbol" onchange="onSymbolChange()">
-              <option value="RELIANCE" selected>RELIANCE (Reliance Ind.)</option>
-              <option value="NIFTY">NIFTY 50</option>
-              <option value="BANKNIFTY">BANK NIFTY</option>
-              <option value="TCS">TCS</option>
-              <option value="INFY">INFY (Infosys)</option>
-              <option value="HDFCBANK">HDFCBANK</option>
-              <option value="ICICIBANK">ICICIBANK</option>
-              <option value="SBIN">SBIN (State Bank)</option>
-              <option value="TATAMOTORS">TATAMOTORS</option>
-              <option value="BAJFINANCE">BAJFINANCE</option>
-            </select>
+            <label class="form-label">Symbol (220+ NSE F&O Stocks)</label>
+            <input type="text" id="ctrlSymbol" value="POLICYBZR" style="font-weight: 700; text-transform: uppercase;" onchange="onManualSymbolChange()">
           </div>
 
           <div class="form-group">
@@ -511,9 +537,9 @@
           <div class="form-group">
             <div class="form-label">
               <span>Strike Price</span>
-              <span id="strikeTxt" class="val">₹1,140.00</span>
+              <span id="strikeTxt" class="val">₹860.00</span>
             </div>
-            <input type="number" id="ctrlStrike" step="5" value="1140" onchange="fetchLiveMarket()">
+            <input type="number" id="ctrlStrike" step="5" value="860" onchange="fetchLiveMarket()">
           </div>
 
           <!-- Type: Call / Put -->
@@ -538,11 +564,11 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div class="form-group">
               <label class="form-label">Entry / Sold Price (₹)</label>
-              <input type="number" id="ctrlPrice" step="0.05" value="3.35" oninput="recalc()">
+              <input type="number" id="ctrlPrice" step="0.05" value="2.00" oninput="recalc()">
             </div>
             <div class="form-group">
               <label class="form-label">Lot Size (Qty)</label>
-              <input type="number" id="ctrlLotSize" value="500" oninput="recalc()">
+              <input type="number" id="ctrlLotSize" value="350" oninput="recalc()">
             </div>
           </div>
 
@@ -550,19 +576,19 @@
           <div class="form-group">
             <div class="form-label">
               <span>Underlying Spot Price</span>
-              <span id="spotTxt" class="val">₹1,158.90</span>
+              <span id="spotTxt" class="val">₹1,047.00</span>
             </div>
-            <input type="number" id="ctrlSpot" step="0.5" value="1158.90" oninput="syncManualSpot(this.value)">
-            <input type="range" id="spotSlider" min="500" max="2000" step="1" value="1159" oninput="syncManualSpot(this.value)">
+            <input type="number" id="ctrlSpot" step="0.5" value="1047.00" oninput="syncManualSpot(this.value)">
+            <input type="range" id="spotSlider" min="200" max="3000" step="1" value="1047" oninput="syncManualSpot(this.value)">
           </div>
 
           <div class="form-group">
             <div class="form-label">
               <span>Implied Volatility (IV %)</span>
-              <span id="ivTxt" class="val">24.9%</span>
+              <span id="ivTxt" class="val">64.7%</span>
             </div>
-            <input type="number" id="ctrlIv" step="0.1" value="24.9" oninput="syncManualIv(this.value)">
-            <input type="range" id="ivSlider" min="5" max="100" step="0.5" value="24.9" oninput="syncManualIv(this.value)">
+            <input type="number" id="ctrlIv" step="0.1" value="64.7" oninput="syncManualIv(this.value)">
+            <input type="range" id="ivSlider" min="5" max="150" step="0.5" value="64.7" oninput="syncManualIv(this.value)">
           </div>
 
           <div class="form-group">
@@ -582,31 +608,31 @@
           <div>
             <div class="pos-name">
               <span id="dispContractTag" style="padding: 2px 8px; border-radius: 4px; font-size: 13px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">
-                RELIANCE 1140 PE
+                POLICYBZR 860 PE
               </span>
-              <span id="dispPositionBadge" class="badge badge-green">SHORT (1 Lot / 500 Qty)</span>
+              <span id="dispPositionBadge" class="badge badge-green">SHORT (1 Lot / 350 Qty)</span>
             </div>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="dispBufferDesc">
-              Spot is ₹18.90 (+1.63%) above strike &bull; Out-Of-The-Money (OTM)
+              Spot is ₹187.00 (+17.86%) above strike &bull; Deep Out-Of-The-Money (OTM)
             </div>
           </div>
 
           <div class="pos-stats">
             <div class="pos-stat-item">
               <span class="pos-stat-label">Live Spot Price</span>
-              <span class="pos-stat-val" id="dispSpot">₹1,158.90</span>
+              <span class="pos-stat-val" id="dispSpot">₹1,047.00</span>
             </div>
             <div class="pos-stat-item">
               <span class="pos-stat-label">Market LTP</span>
-              <span class="pos-stat-val" style="color: #fbbf24;" id="dispLtp">₹14.35</span>
+              <span class="pos-stat-val" style="color: #fbbf24;" id="dispLtp">₹3.50</span>
             </div>
             <div class="pos-stat-item">
               <span class="pos-stat-label">Entry Avg</span>
-              <span class="pos-stat-val" id="dispEntry">₹3.35</span>
+              <span class="pos-stat-val" id="dispEntry">₹2.00</span>
             </div>
             <div class="pos-stat-item">
               <span class="pos-stat-label">Unrealized P&L</span>
-              <span class="pos-stat-val" id="dispPnl" style="color: #f87171;">-₹5,500.00</span>
+              <span class="pos-stat-val" id="dispPnl" style="color: #f87171;">-₹525.00</span>
             </div>
           </div>
         </div>
@@ -616,40 +642,40 @@
           <!-- Probability Expiring Worthless -->
           <div class="metric-card hero">
             <div class="metric-title">Prob Expiring Worthless (PoW)</div>
-            <div class="metric-val" id="powDisplay">63.89%</div>
-            <div class="metric-desc" id="powDesc">If Spot ≥ ₹1,140.00 at expiry</div>
+            <div class="metric-val" id="powDisplay">92.73%</div>
+            <div class="metric-desc" id="powDesc">If Spot ≥ ₹860.00 at expiry</div>
             <div class="progress-bar">
-              <div class="progress-fill" id="powBar" style="width: 63.89%; background: #10b981;"></div>
+              <div class="progress-fill" id="powBar" style="width: 92.73%; background: #10b981;"></div>
             </div>
           </div>
 
           <!-- Probability of Profit -->
           <div class="metric-card">
             <div class="metric-title">Prob of Profit (PoP)</div>
-            <div class="metric-val" id="popDisplay" style="color: #60a5fa;">66.05%</div>
-            <div class="metric-desc" id="popDesc">Breakeven: ₹1,136.65</div>
+            <div class="metric-val" id="popDisplay" style="color: #60a5fa;">92.97%</div>
+            <div class="metric-desc" id="popDesc">Breakeven: ₹858.00</div>
             <div class="progress-bar">
-              <div class="progress-fill" id="popBar" style="width: 66.05%; background: #3b82f6;"></div>
+              <div class="progress-fill" id="popBar" style="width: 92.97%; background: #3b82f6;"></div>
             </div>
           </div>
 
           <!-- Probability of Touch -->
           <div class="metric-card">
             <div class="metric-title">Prob of Touch (PoT)</div>
-            <div class="metric-val" id="potDisplay" style="color: #f59e0b;">73.74%</div>
+            <div class="metric-val" id="potDisplay" style="color: #f59e0b;">14.27%</div>
             <div class="metric-desc">Likelihood price touches strike</div>
             <div class="progress-bar">
-              <div class="progress-fill" id="potBar" style="width: 73.74%; background: #f59e0b;"></div>
+              <div class="progress-fill" id="potBar" style="width: 14.27%; background: #f59e0b;"></div>
             </div>
           </div>
 
           <!-- Delta Proxy -->
           <div class="metric-card">
             <div class="metric-title">Delta Proxy (1 - |Δ|)</div>
-            <div class="metric-val" id="deltaProxyDisplay" style="color: #a78bfa;">64.68%</div>
-            <div class="metric-desc" id="deltaProxyDesc">Delta: -0.353</div>
+            <div class="metric-val" id="deltaProxyDisplay" style="color: #a78bfa;">94.37%</div>
+            <div class="metric-desc" id="deltaProxyDesc">Delta: -0.056</div>
             <div class="progress-bar">
-              <div class="progress-fill" id="deltaProxyBar" style="width: 64.68%; background: #8b5cf6;"></div>
+              <div class="progress-fill" id="deltaProxyBar" style="width: 94.37%; background: #8b5cf6;"></div>
             </div>
           </div>
         </div>
@@ -657,9 +683,9 @@
         <!-- Probability Distribution Chart -->
         <div class="card">
           <div class="card-title">
-            <span>Log-Normal Probability Density & Risk Zone</span>
+            <span>Log-Normal Probability Distribution & Risk Range</span>
             <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">
-              Hover cursor over chart to inspect stock price levels
+              Hover crosshair across chart to inspect probability density and prices
             </span>
           </div>
 
@@ -671,23 +697,23 @@
           <div class="greeks-grid">
             <div class="greek-box">
               <div class="greek-label">Delta (Δ)</div>
-              <div class="greek-val" id="gDelta">-0.3532</div>
+              <div class="greek-val" id="gDelta">-0.0563</div>
             </div>
             <div class="greek-box">
               <div class="greek-label">Gamma (Γ)</div>
-              <div class="greek-val" id="gGamma">0.0063</div>
+              <div class="greek-val" id="gGamma">0.0008</div>
             </div>
             <div class="greek-box">
               <div class="greek-label">Daily Theta (Lot)</div>
-              <div class="greek-val" id="gThetaLot" style="color: #34d399;">+₹362.85/d</div>
+              <div class="greek-val" id="gThetaLot" style="color: #34d399;">+₹177.45/d</div>
             </div>
             <div class="greek-box">
               <div class="greek-label">Vega (ν) / 1% IV</div>
-              <div class="greek-val" id="gVega">₹0.8742</div>
+              <div class="greek-val" id="gVega">₹0.2404</div>
             </div>
             <div class="greek-box">
               <div class="greek-label">Max Profit</div>
-              <div class="greek-val" id="dispMaxProfit" style="color: #34d399;">+₹1,675.00</div>
+              <div class="greek-val" id="dispMaxProfit" style="color: #34d399;">+₹700.00</div>
             </div>
           </div>
         </div>
@@ -730,7 +756,7 @@
         🔑 Upstox API Token Configuration
       </h3>
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-        When hosted online (e.g. GitHub Pages or Vercel), enter your Upstox API Bearer token below. It is stored securely in your browser's <code>localStorage</code>.
+        Enter your Upstox Bearer token below. It is saved in your device's private browser <code>localStorage</code> so your hosted GitHub Pages site can fetch live quotes directly.
       </p>
       <input type="text" id="tokenInput" placeholder="eyJ0eXAi..." style="width: 100%; margin-bottom: 16px;">
       <div style="display: flex; justify-content: flex-end; gap: 8px;">
@@ -739,6 +765,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Load 220 F&O Instruments Map -->
+  <script src="fno_instruments.js"></script>
 
   <script>
     // Math Utilities
@@ -753,61 +782,115 @@
     function normCdf(x) { return 0.5 * (1.0 + erf(x / Math.SQRT2)); }
     function normPdf(x) { return Math.exp(-0.5 * x * x) / Math.sqrt(2.0 * Math.PI); }
 
+    // Fallback FNO map if js file didn't load
+    const FNO = (typeof FNO_INSTRUMENTS !== 'undefined') ? FNO_INSTRUMENTS : {
+      "RELIANCE": { "instrument_key": "NSE_EQ|INE002A01018", "lot_size": 500 },
+      "POLICYBZR": { "instrument_key": "NSE_EQ|INE417T01026", "lot_size": 350 },
+      "NIFTY": { "instrument_key": "NSE_INDEX|Nifty 50", "lot_size": 25 },
+      "BANKNIFTY": { "instrument_key": "NSE_INDEX|Nifty Bank", "lot_size": 15 },
+      "TCS": { "instrument_key": "NSE_EQ|INE467B01029", "lot_size": 175 },
+      "INFY": { "instrument_key": "NSE_EQ|INE009A01021", "lot_size": 400 }
+    };
+
     // State
     const state = {
-      symbol: "RELIANCE",
-      strike: 1140.0,
+      symbol: "POLICYBZR",
+      strike: 860.0,
       optionType: "put",
       isShort: true,
-      price: 3.35,
-      lotSize: 500,
-      spot: 1158.90,
-      iv: 0.249,
+      price: 2.0,
+      lotSize: 350,
+      spot: 1047.00,
+      iv: 0.647,
       dte: 15.0,
       rate: 0.0675,
-      ltp: 14.35,
+      ltp: 3.50,
       token: ""
     };
 
-    const LOT_SIZES = {
-      "RELIANCE": 500, "NIFTY": 25, "BANKNIFTY": 15, "FINNIFTY": 25,
-      "TCS": 175, "INFY": 400, "HDFCBANK": 550, "ICICIBANK": 700,
-      "SBIN": 750, "TATAMOTORS": 575, "BAJFINANCE": 125
-    };
+    // Recent Trades Memory (Last 5)
+    const DEFAULT_TRADES = [
+      "POLICYBZR 27 OCT 860 PUT SHORT 2.0",
+      "RELIANCE 27 OCT 1140 PUT SHORT 3.35",
+      "NIFTY 27 OCT 22400 CE",
+      "BANKNIFTY 27 OCT 48000 PE",
+      "TCS 27 OCT 3900 PE"
+    ];
 
-    // Exact Ticker Parser (Deterministic regex, zero LLM needed)
+    function getRecentTrades() {
+      try {
+        const raw = localStorage.getItem("options_recent_trades");
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return DEFAULT_TRADES;
+    }
+
+    function addRecentTrade(tickerStr) {
+      let list = getRecentTrades();
+      // Remove if already exists
+      list = list.filter(t => t.toUpperCase() !== tickerStr.toUpperCase());
+      // Prepend to top
+      list.unshift(tickerStr);
+      // Keep only 5
+      list = list.slice(0, 5);
+      try {
+        localStorage.setItem("options_recent_trades", JSON.stringify(list));
+      } catch (e) {}
+      renderRecentChips();
+    }
+
+    function removeRecentTrade(idx, e) {
+      if (e) e.stopPropagation();
+      let list = getRecentTrades();
+      list.splice(idx, 1);
+      try {
+        localStorage.setItem("options_recent_trades", JSON.stringify(list));
+      } catch (e) {}
+      renderRecentChips();
+    }
+
+    function renderRecentChips() {
+      const container = document.getElementById("recentChips");
+      const list = getRecentTrades();
+      container.innerHTML = list.map((trade, idx) => `
+        <button class="chip" onclick="applyRecentTrade('${trade}')">
+          <span>${trade}</span>
+          <span class="chip-del" onclick="removeRecentTrade(${idx}, event)" title="Remove">✕</span>
+        </button>
+      `).join("");
+    }
+
+    function applyRecentTrade(trade) {
+      document.getElementById("tickerInput").value = trade;
+      executeTickerSearch();
+    }
+
+    // Exact Ticker Parser
     function parseExactTicker(text) {
       text = text.trim();
-
-      // 1. Match expiry pattern like '27 OCT' or '27-OCT' or 'OCT 27'
       const expMatch = text.match(/\b(\d{1,2})\s*[- ]\s*([A-Za-z]{3})\b/i);
       let expDay = null, expMonth = null, expStr = null;
-      let cleanedText = text;
+      let cleaned = text;
       if (expMatch) {
         expDay = parseInt(expMatch[1], 10);
         expMonth = expMatch[2].toUpperCase();
         expStr = `${expDay} ${expMonth}`;
-        cleanedText = text.slice(0, expMatch.index) + ' ' + text.slice(expMatch.index + expMatch[0].length);
+        cleaned = text.slice(0, expMatch.index) + ' ' + text.slice(expMatch.index + expMatch[0].length);
       }
 
-      // 2. Extract Option Type (PUT/PE vs CALL/CE)
-      const optType = /\b(put|pe)\b/i.test(cleanedText) ? 'put' : (/\b(call|ce)\b/i.test(cleanedText) ? 'call' : 'put');
+      const optType = /\b(put|pe)\b/i.test(cleaned) ? 'put' : (/\b(call|ce)\b/i.test(cleaned) ? 'call' : 'put');
+      const isShort = !(/\b(long|buy)\b/i.test(cleaned));
 
-      // 3. Position Stance (Short/Sell vs Long/Buy)
-      const isShort = !(/\b(long|buy)\b/i.test(cleanedText)); // defaults to Short (Credit)
-
-      // 4. Symbol is the first non-keyword word
-      const words = cleanedText.trim().split(/\s+/);
-      let symbol = state.symbol || 'RELIANCE';
+      const words = cleaned.trim().split(/\s+/);
+      let symbol = state.symbol;
       for (const w of words) {
-        if (/^[A-Za-z]+$/.test(w) && !['PUT', 'PE', 'CALL', 'CE', 'SHORT', 'SELL', 'LONG', 'BUY', 'LOT'].includes(w.toUpperCase())) {
+        if (/^[A-Za-z0-9_-]+$/.test(w) && !['PUT', 'PE', 'CALL', 'CE', 'SHORT', 'SELL', 'LONG', 'BUY', 'LOT'].includes(w.toUpperCase())) {
           symbol = w.toUpperCase();
           break;
         }
       }
 
-      // 5. Extract numbers (excluding the expiry day)
-      const numMatches = cleanedText.match(/\b\d+(?:\.\d+)?\b/g);
+      const numMatches = cleaned.match(/\b\d+(?:\.\d+)?\b/g);
       let strike = state.strike;
       let price = null;
       if (numMatches && numMatches.length > 0) {
@@ -815,40 +898,32 @@
         if (nums.length === 1) {
           strike = nums[0];
         } else {
-          strike = nums[nums.length - 1]; // Largest is strike
-          price = nums[0];               // Smaller is entry price
+          strike = nums[nums.length - 1]; // largest is strike
+          price = nums[0];               // smaller is entry price
         }
       }
 
-      return {
-        symbol: symbol,
-        expiryDay: expDay,
-        expiryMonth: expMonth,
-        expiryStr: expStr,
-        strike: strike,
-        optionType: optType,
-        isShort: isShort,
-        price: price
-      };
+      return { symbol, expDay, expMonth, expStr, strike, optType, isShort, price };
     }
 
-    function executeExactTickerSearch() {
-      const inputEl = document.getElementById("nlInput");
-      const q = inputEl.value.trim();
+    function executeTickerSearch() {
+      const q = document.getElementById("tickerInput").value.trim();
       if (!q) return;
 
       const p = parseExactTicker(q);
-
       state.symbol = p.symbol;
       document.getElementById("ctrlSymbol").value = p.symbol;
-      state.lotSize = LOT_SIZES[p.symbol] || 500;
-      document.getElementById("ctrlLotSize").value = state.lotSize;
 
-      if (p.strike) {
-        state.strike = p.strike;
-        document.getElementById("ctrlStrike").value = p.strike;
+      // Update lot size from FNO database
+      if (FNO[p.symbol]) {
+        state.lotSize = FNO[p.symbol].lot_size || 500;
+        document.getElementById("ctrlLotSize").value = state.lotSize;
       }
-      setOptionType(p.optionType);
+
+      state.strike = p.strike;
+      document.getElementById("ctrlStrike").value = p.strike;
+
+      setOptionType(p.optType);
       setStance(p.isShort);
 
       if (p.price !== null) {
@@ -856,17 +931,12 @@
         document.getElementById("ctrlPrice").value = p.price;
       }
 
-      // If user typed '27 OCT', ensure expiry select matches 2026-10-27
-      if (p.expiryStr && p.expiryStr.includes('OCT')) {
-        document.getElementById("ctrlExpiry").value = "2026-10-27";
-      }
+      // Add to recent trades (save as normalized ticker)
+      const expStrDisplay = p.expStr || "27 OCT";
+      const normalizedTrade = `${p.symbol} ${expStrDisplay} ${p.strike} ${p.optType.toUpperCase()} ${p.isShort ? 'SHORT' : 'LONG'}${p.price ? ' ' + p.price : ''}`;
+      addRecentTrade(normalizedTrade);
 
       fetchLiveMarket();
-    }
-
-    function applyTickerPreset(presetText) {
-      document.getElementById("nlInput").value = presetText;
-      executeExactTickerSearch();
     }
 
     function setOptionType(type) {
@@ -883,21 +953,16 @@
       recalc();
     }
 
-    function onSymbolChange() {
-      state.symbol = document.getElementById("ctrlSymbol").value;
-      state.lotSize = LOT_SIZES[state.symbol] || 500;
-      document.getElementById("ctrlLotSize").value = state.lotSize;
-      
-      // Default strike per symbol
-      if (state.symbol === 'NIFTY') state.strike = 22400;
-      else if (state.symbol === 'BANKNIFTY') state.strike = 48000;
-      else if (state.symbol === 'RELIANCE') state.strike = 1140;
-      else if (state.symbol === 'TCS') state.strike = 3900;
-      else if (state.symbol === 'INFY') state.strike = 1500;
-      else if (state.symbol === 'HDFCBANK') state.strike = 1500;
-      document.getElementById("ctrlStrike").value = state.strike;
-
-      fetchLiveMarket();
+    function onManualSymbolChange() {
+      const val = document.getElementById("ctrlSymbol").value.trim().toUpperCase();
+      if (val) {
+        state.symbol = val;
+        if (FNO[val]) {
+          state.lotSize = FNO[val].lot_size || 500;
+          document.getElementById("ctrlLotSize").value = state.lotSize;
+        }
+        fetchLiveMarket();
+      }
     }
 
     function syncManualSpot(val) {
@@ -920,43 +985,128 @@
       recalc();
     }
 
-    // Live Fetch from Server or Direct Upstox
+    // Direct Upstox API Fetching (Works on both GitHub Pages & Localhost)
     async function fetchLiveMarket() {
-      const sym = state.symbol;
-      const strike = parseFloat(document.getElementById("ctrlStrike").value);
+      const sym = state.symbol.toUpperCase();
+      const strike = parseFloat(document.getElementById("ctrlStrike").value) || state.strike;
       state.strike = strike;
       const optType = state.optionType;
-      const exp = document.getElementById("ctrlExpiry").value;
-      const soldPrice = parseFloat(document.getElementById("ctrlPrice").value);
+      const token = state.token || localStorage.getItem("upstox_token");
+      const statusEl = document.getElementById("fetchStatus");
+
+      statusEl.innerText = `Fetching ${sym} live data...`;
+      statusEl.className = "loading-pulse";
+
+      // 1. Try local backend server first (if running python serve.py)
+      try {
+        const resp = await fetch(`/api/upstox/analyze?symbol=${sym}&strike=${strike}&type=${optType}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === 'success') {
+            applyMarketData(data.market);
+            statusEl.innerText = `Live Connected (Local)`;
+            statusEl.className = "";
+            return;
+          }
+        }
+      } catch (e) {
+        // Fallback to client-side direct Upstox API request (GitHub Pages mode)
+      }
+
+      // 2. Direct client-side Upstox API call
+      if (!token) {
+        statusEl.innerText = "Offline (Enter Token in Settings to Sync Live)";
+        statusEl.className = "";
+        recalc();
+        return;
+      }
 
       try {
-        const resp = await fetch(`/api/upstox/analyze?symbol=${sym}&strike=${strike}&type=${optType}&expiry=${exp}&sold_price=${soldPrice}&is_short=${state.isShort}`);
-        const data = await resp.json();
-        if (data.status === 'success') {
-          const m = data.market;
-          state.spot = m.spot;
-          state.ltp = m.ltp;
-          state.dte = m.dte_days;
-          if (m.iv) state.iv = m.iv / 100.0;
-          if (m.lot_size) state.lotSize = m.lot_size;
+        const fnoInfo = FNO[sym];
+        const instKey = fnoInfo ? fnoInfo.instrument_key : `NSE_EQ|${sym}`;
+        const headers = {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
+        };
 
-          // Update inputs
-          document.getElementById("ctrlSpot").value = state.spot;
-          document.getElementById("spotSlider").value = state.spot;
-          document.getElementById("ctrlDte").value = state.dte;
-          document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
-          document.getElementById("ivSlider").value = (state.iv * 100).toFixed(1);
-          document.getElementById("ctrlLotSize").value = state.lotSize;
+        // Fetch expiries
+        const expResp = await fetch(`https://api.upstox.com/v2/option/contract?instrument_key=${encodeURIComponent(instKey)}`, { headers });
+        const expData = await expResp.json();
+        const contracts = expData.data || [];
+        const expiries = Array.from(new Set(contracts.map(c => c.expiry))).sort();
 
+        let expiryDate = expiries[0] || "2026-10-27";
+        // Populate expiry dropdown
+        const expSelect = document.getElementById("ctrlExpiry");
+        expSelect.innerHTML = expiries.slice(0, 5).map(e => `<option value="${e}" ${e === expiryDate ? 'selected' : ''}>${e}</option>`).join("");
+
+        // Fetch option chain
+        const chainResp = await fetch(`https://api.upstox.com/v2/option/chain?instrument_key=${encodeURIComponent(instKey)}&expiry_date=${expiryDate}`, { headers });
+        const chainData = await chainResp.json();
+        const chain = chainData.data || [];
+
+        // Find target strike
+        let target = chain.find(c => Math.abs(c.strike_price - strike) < 0.1);
+        if (!target && chain.length > 0) {
+          // If strike not exact match, pick closest
+          target = chain.reduce((prev, curr) => Math.abs(curr.strike_price - strike) < Math.abs(prev.strike_price - strike) ? curr : prev);
+        }
+
+        if (target) {
+          const spot = target.underlying_spot_price;
+          const opt = (optType === 'put') ? target.put_options : target.call_options;
+          const mkt = opt.market_data || {};
+          const greeks = opt.option_greeks || {};
+
+          // Calculate DTE
+          const expD = new Date(expiryDate);
+          const today = new Date();
+          const dteDays = Math.max(0.5, (expD - today) / (1000 * 60 * 60 * 24));
+
+          applyMarketData({
+            spot: spot,
+            ltp: mkt.ltp || state.ltp,
+            iv: greeks.iv,
+            dte_days: dteDays,
+            lot_size: fnoInfo ? fnoInfo.lot_size : state.lotSize
+          });
+
+          statusEl.innerText = `Live Connected (Direct Upstox API)`;
+          statusEl.className = "";
+        } else {
+          statusEl.innerText = `Strike ${strike} not in chain`;
+          statusEl.className = "";
           recalc();
         }
       } catch (err) {
-        // If server endpoint unavailable (e.g. opened statically), calculate locally!
+        console.warn("Direct Upstox fetch error:", err);
+        statusEl.innerText = `Error: ${err.message || 'Token expired or network error'}`;
+        statusEl.className = "";
         recalc();
       }
     }
 
-    // Core Analytics & Recalculation
+    function applyMarketData(m) {
+      if (m.spot) state.spot = m.spot;
+      if (m.ltp !== undefined && m.ltp !== null) state.ltp = m.ltp;
+      if (m.iv) state.iv = m.iv / 100.0;
+      if (m.dte_days) state.dte = m.dte_days;
+      if (m.lot_size) state.lotSize = m.lot_size;
+
+      document.getElementById("ctrlSpot").value = state.spot;
+      document.getElementById("spotSlider").value = state.spot;
+      document.getElementById("spotSlider").min = Math.round(state.spot * 0.4);
+      document.getElementById("spotSlider").max = Math.round(state.spot * 1.8);
+
+      document.getElementById("ctrlDte").value = state.dte.toFixed(1);
+      document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
+      document.getElementById("ivSlider").value = (state.iv * 100).toFixed(1);
+      document.getElementById("ctrlLotSize").value = state.lotSize;
+
+      recalc();
+    }
+
+    // Core Calculations & Visual Updates
     function recalc() {
       state.price = parseFloat(document.getElementById("ctrlPrice").value) || 0.01;
       state.lotSize = parseInt(document.getElementById("ctrlLotSize").value) || 1;
@@ -978,12 +1128,9 @@
         : Math.max(0.01, state.strike - state.price);
 
       let beD2 = (Math.log(state.spot / breakeven) + (state.rate - 0.5 * state.iv * state.iv) * t) / sigmaSqrtT;
-      let pop = 0;
-      if (state.optionType === 'call') {
-        pop = state.isShort ? (1.0 - normCdf(beD2)) : normCdf(beD2);
-      } else {
-        pop = state.isShort ? normCdf(beD2) : (1.0 - normCdf(beD2));
-      }
+      let pop = (state.optionType === 'call')
+        ? (state.isShort ? (1.0 - normCdf(beD2)) : normCdf(beD2))
+        : (state.isShort ? normCdf(beD2) : (1.0 - normCdf(beD2)));
       pop = Math.max(0, Math.min(1, pop));
 
       // PoT
@@ -1000,7 +1147,7 @@
       let thetaLot = thetaDaily * state.lotSize * (state.isShort ? -1 : 1);
       let vega = (state.spot * Math.sqrt(t) * pdfD1) / 100.0;
 
-      // Update UI Displays
+      // Header Banner UI
       document.getElementById("dispContractTag").innerText = `${state.symbol} ${state.strike} ${state.optionType.toUpperCase()}`;
       document.getElementById("dispPositionBadge").innerText = `${state.isShort ? 'SHORT' : 'LONG'} (1 Lot / ${state.lotSize} Qty)`;
       document.getElementById("dispPositionBadge").className = state.isShort ? 'badge badge-green' : 'badge badge-blue';
@@ -1015,7 +1162,7 @@
       document.getElementById("dispSpot").innerText = `₹${state.spot.toFixed(2)}`;
       document.getElementById("dispLtp").innerText = `₹${state.ltp.toFixed(2)}`;
       document.getElementById("dispEntry").innerText = `₹${state.price.toFixed(2)}`;
-      
+
       const pnl = state.isShort 
         ? (state.price - state.ltp) * state.lotSize 
         : (state.ltp - state.price) * state.lotSize;
@@ -1023,7 +1170,7 @@
       pnlEl.innerText = `${pnl >= 0 ? '+' : ''}₹${pnl.toFixed(2)}`;
       pnlEl.style.color = pnl >= 0 ? '#34d399' : '#f87171';
 
-      // Text labels
+      // Labels
       document.getElementById("strikeTxt").innerText = `₹${state.strike.toFixed(2)}`;
       document.getElementById("spotTxt").innerText = `₹${state.spot.toFixed(2)}`;
       document.getElementById("ivTxt").innerText = `${(state.iv * 100).toFixed(1)}%`;
@@ -1059,11 +1206,8 @@
       const maxProfit = state.isShort ? state.price * state.lotSize : Infinity;
       document.getElementById("dispMaxProfit").innerText = maxProfit === Infinity ? 'Unlimited' : `+₹${maxProfit.toFixed(2)}`;
 
-      // Render Scenarios Table
       renderScenarios(breakeven);
-
-      // Render Chart
-      drawChart(d1, d2, breakeven);
+      drawChart(breakeven);
     }
 
     function renderScenarios(breakeven) {
@@ -1089,7 +1233,7 @@
         html += `
           <tr>
             <td class="text-left font-bold" style="color: ${m > 0 ? '#34d399' : (m < 0 ? '#f87171' : '#fff')}">
-              ${m > 0 ? '+' : ''}${(m * 100).toFixed(0)}% ${m === 0 ? 'Current Price' : (m > 0 ? 'Rally' : 'Drop')}
+              ${m > 0 ? '+' : ''}${(m * 100).toFixed(0)}% ${m === 0 ? 'Current Spot' : (m > 0 ? 'Rally' : 'Drop')}
             </td>
             <td>₹${sSpot.toFixed(2)}</td>
             <td>${m > 0 ? '+' : ''}${(m * 100).toFixed(1)}%</td>
@@ -1117,9 +1261,9 @@
       tbody.innerHTML = html;
     }
 
-    // Chart Canvas Rendering
+    // ACCURATE CHART AXIS & DISTRIBUTION RENDERING
     let hoverX = null;
-    function drawChart(d1, d2, breakeven) {
+    function drawChart(breakeven) {
       const canvas = document.getElementById("pdfCanvas");
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
@@ -1134,12 +1278,25 @@
 
       const t = Math.max(1e-5, state.dte / 365.0);
       const v = state.iv * Math.sqrt(t);
-      const minPrice = Math.max(1, state.spot * Math.exp(-2.5 * v));
-      const maxPrice = state.spot * Math.exp(2.5 * v);
-      const priceSpan = maxPrice - minPrice;
 
-      function pToX(p) { return ((p - minPrice) / priceSpan) * (width - 80) + 40; }
-      function xToP(x) { return minPrice + ((x - 40) / (width - 80)) * priceSpan; }
+      // ENSURE THE X-AXIS FULLY COVERS SPOT, STRIKE, BREAKEVEN, AND ±2 SIGMA MOVES
+      const s2Low = state.spot * Math.exp(-2.2 * v);
+      const s2High = state.spot * Math.exp(2.2 * v);
+      const allPrices = [state.spot, state.strike, breakeven, s2Low, s2High];
+      let minPrice = Math.min(...allPrices) * 0.94;
+      let maxPrice = Math.max(...allPrices) * 1.06;
+      if (maxPrice <= minPrice) maxPrice = minPrice + 100;
+
+      const priceSpan = maxPrice - minPrice;
+      const chartLeft = 50;
+      const chartRight = width - 40;
+      const chartTop = 30;
+      const chartBottom = height - 45;
+      const chartW = chartRight - chartLeft;
+      const chartH = chartBottom - chartTop;
+
+      function pToX(p) { return chartLeft + ((p - minPrice) / priceSpan) * chartW; }
+      function xToP(x) { return minPrice + ((x - chartLeft) / chartW) * priceSpan; }
 
       const mu = Math.log(state.spot) + (state.rate - 0.5 * state.iv * state.iv) * t;
       function logPdf(p) {
@@ -1148,26 +1305,54 @@
         return (1.0 / (p * v * Math.sqrt(2 * Math.PI))) * Math.exp(-(diff * diff) / (2 * v * v));
       }
 
-      const steps = 250;
+      // Generate points
+      const steps = 300;
       const pts = [];
       let maxPdf = 0;
       for (let i = 0; i <= steps; i++) {
-        const x = 40 + (i / steps) * (width - 80);
+        const x = chartLeft + (i / steps) * chartW;
         const p = xToP(x);
         const yVal = logPdf(p);
         if (yVal > maxPdf) maxPdf = yVal;
         pts.push({ x, price: p, pdf: yVal });
       }
+      if (maxPdf === 0) maxPdf = 0.01;
+      function valToY(val) { return chartBottom - (val / (maxPdf * 1.15)) * chartH; }
 
-      const chartTop = 30;
-      const chartBottom = height - 40;
-      const chartH = chartBottom - chartTop;
-      function valToY(v) { return chartBottom - (v / (maxPdf * 1.15)) * chartH; }
+      // 1. Draw Grid Lines & Rounded Numerical X-Axis Ticks
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.font = '10px monospace';
+      ctx.fillStyle = '#64748b';
+      ctx.textAlign = 'center';
 
-      // 1. Shaded Worthless vs ITM
+      const numTicks = 6;
+      for (let i = 0; i <= numTicks; i++) {
+        const tickPrice = minPrice + (i / numTicks) * priceSpan;
+        const xPos = pToX(tickPrice);
+
+        // Vertical grid line
+        ctx.beginPath();
+        ctx.moveTo(xPos, chartTop);
+        ctx.lineTo(xPos, chartBottom);
+        ctx.stroke();
+
+        // X-axis price label at bottom
+        ctx.fillText(`₹${Math.round(tickPrice)}`, xPos, chartBottom + 16);
+      }
+
+      // Horizontal baseline
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(chartLeft, chartBottom);
+      ctx.lineTo(chartRight, chartBottom);
+      ctx.stroke();
+
+      // 2. Shaded Worthless vs ITM Regions
       const strikeX = pToX(state.strike);
 
-      // Worthless region (Green)
+      // Worthless fill (Green)
       ctx.save();
       ctx.beginPath();
       let started = false;
@@ -1181,15 +1366,15 @@
         }
       }
       if (started) {
-        if (state.optionType === 'call') ctx.lineTo(Math.min(strikeX, width - 40), chartBottom);
-        else ctx.lineTo(width - 40, chartBottom);
+        if (state.optionType === 'call') ctx.lineTo(Math.min(strikeX, chartRight), chartBottom);
+        else ctx.lineTo(chartRight, chartBottom);
         ctx.closePath();
         ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
         ctx.fill();
       }
       ctx.restore();
 
-      // ITM region (Red)
+      // ITM fill (Red)
       ctx.save();
       ctx.beginPath();
       started = false;
@@ -1203,15 +1388,15 @@
         }
       }
       if (started) {
-        if (state.optionType === 'call') ctx.lineTo(width - 40, chartBottom);
-        else ctx.lineTo(Math.min(strikeX, width - 40), chartBottom);
+        if (state.optionType === 'call') ctx.lineTo(chartRight, chartBottom);
+        else ctx.lineTo(Math.min(strikeX, chartRight), chartBottom);
         ctx.closePath();
         ctx.fillStyle = 'rgba(239, 68, 68, 0.20)';
         ctx.fill();
       }
       ctx.restore();
 
-      // 2. Draw Curve
+      // 3. Draw Probability Curve Line
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -1222,12 +1407,12 @@
       }
       ctx.stroke();
 
-      // 3. Vertical Markers
+      // 4. Draw Key Markers (Spot, Strike, Breakeven)
       function drawPin(xPos, color, text, sub) {
-        if (xPos < 35 || xPos > width - 35) return;
+        if (xPos < chartLeft - 10 || xPos > chartRight + 10) return;
         ctx.save();
         ctx.strokeStyle = color;
-        ctx.setLineDash([4, 4]);
+        ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(xPos, chartTop);
@@ -1236,12 +1421,12 @@
 
         ctx.setLineDash([]);
         ctx.fillStyle = color;
-        ctx.font = '700 10px -apple-system, sans-serif';
+        ctx.font = '700 11px -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(text, xPos, chartTop - 6);
-        ctx.font = '10px monospace';
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillText(sub, xPos, chartBottom + 14);
+        ctx.fillText(text, xPos, chartTop - 8);
+
+        ctx.font = '700 10px monospace';
+        ctx.fillText(sub, xPos, chartBottom + 32);
         ctx.restore();
       }
 
@@ -1249,16 +1434,8 @@
       drawPin(strikeX, '#fbbf24', `Strike`, `₹${state.strike.toFixed(0)}`);
       drawPin(pToX(breakeven), '#ec4899', `B/E`, `₹${breakeven.toFixed(0)}`);
 
-      // Baseline
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(40, chartBottom);
-      ctx.lineTo(width - 40, chartBottom);
-      ctx.stroke();
-
-      // Hover Tooltip
-      if (hoverX !== null && hoverX >= 40 && hoverX <= width - 40) {
+      // 5. Hover Crosshair Tooltip
+      if (hoverX !== null && hoverX >= chartLeft && hoverX <= chartRight) {
         const hPrice = xToP(hoverX);
         const hPdf = logPdf(hPrice);
         const hY = valToY(hPdf);
@@ -1268,9 +1445,17 @@
         ctx.arc(hoverX, hY, 4, 0, Math.PI * 2);
         ctx.fill();
 
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(hoverX, chartTop);
+        ctx.lineTo(hoverX, chartBottom);
+        ctx.stroke();
+
         const isW = (state.optionType === 'call' && hPrice <= state.strike) || (state.optionType === 'put' && hPrice >= state.strike);
         ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
         ctx.strokeStyle = '#334155';
+        ctx.setLineDash([]);
         const boxX = hoverX > width - 150 ? hoverX - 140 : hoverX + 12;
         const boxY = Math.max(chartTop, hY - 30);
         ctx.fillRect(boxX, boxY, 130, 44);
@@ -1320,9 +1505,10 @@
       });
       window.addEventListener("resize", () => recalc());
 
-      // Check stored token
+      // Load token & recent trades
       const stored = localStorage.getItem("upstox_token");
       if (stored) state.token = stored;
+      renderRecentChips();
 
       // Initial analysis
       fetchLiveMarket();

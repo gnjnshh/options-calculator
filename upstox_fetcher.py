@@ -19,62 +19,34 @@ TOKEN_PATHS = [
     "Upstox API.txt"
 ]
 
-# Extended NSE F&O Symbols Map
-INSTRUMENT_MAP = {
-    # Indices
-    "NIFTY": "NSE_INDEX|Nifty 50",
-    "NIFTY 50": "NSE_INDEX|Nifty 50",
-    "BANKNIFTY": "NSE_INDEX|Nifty Bank",
-    "NIFTY BANK": "NSE_INDEX|Nifty Bank",
-    "FINNIFTY": "NSE_INDEX|Nifty Fin Service",
-    "MIDCPNIFTY": "NSE_INDEX|NIFTY MID SELECT",
+# Load all 220 NSE F&O Symbols Map
+INSTRUMENT_MAP = {}
+LOT_SIZE_MAP = {}
 
-    # Top F&O Equities
-    "RELIANCE": "NSE_EQ|INE002A01018",
-    "TCS": "NSE_EQ|INE467B01029",
-    "INFY": "NSE_EQ|INE009A01021",
-    "HDFCBANK": "NSE_EQ|INE040A01034",
-    "ICICIBANK": "NSE_EQ|INE090A01021",
-    "SBIN": "NSE_EQ|INE062A01020",
-    "TATAMOTORS": "NSE_EQ|INE155A01022",
-    "BAJFINANCE": "NSE_EQ|INE296A01024",
-    "BHARTIARTL": "NSE_EQ|INE397D01024",
-    "ITC": "NSE_EQ|INE154A01025",
-    "LT": "NSE_EQ|INE018A01030",
-    "AXISBANK": "NSE_EQ|INE238A01034",
-    "KOTAKBANK": "NSE_EQ|INE237A01028",
-    "MARUTI": "NSE_EQ|INE585B01010",
-    "WIPRO": "NSE_EQ|INE075A01022",
-    "SUNPHARMA": "NSE_EQ|INE044A01036",
-    "HCLTECH": "NSE_EQ|INE860A01027",
-    "TITAN": "NSE_EQ|INE280A01028",
-    "ASIANPAINT": "NSE_EQ|INE021A01026",
-    "TATASTEEL": "NSE_EQ|INE081A01020"
-}
+_fno_json_path = os.path.join(os.path.dirname(__file__), "fno_instruments.json")
+if os.path.exists(_fno_json_path):
+    try:
+        with open(_fno_json_path, "r", encoding="utf-8") as _f:
+            _fno_data = json.load(_f)
+            for _sym, _info in _fno_data.items():
+                INSTRUMENT_MAP[_sym] = _info.get("instrument_key")
+                LOT_SIZE_MAP[_sym] = _info.get("lot_size", 500)
+    except Exception as _e:
+        pass
 
-# Standard NSE Lot Sizes
-LOT_SIZE_MAP = {
-    "RELIANCE": 500,
-    "NIFTY": 25,
-    "NIFTY 50": 25,
-    "BANKNIFTY": 15,
-    "FINNIFTY": 25,
-    "MIDCPNIFTY": 50,
-    "TCS": 175,
-    "INFY": 400,
-    "HDFCBANK": 550,
-    "ICICIBANK": 700,
-    "SBIN": 750,
-    "TATAMOTORS": 575,
-    "BAJFINANCE": 125,
-    "BHARTIARTL": 475,
-    "ITC": 1600,
-    "LT": 175,
-    "AXISBANK": 625,
-    "KOTAKBANK": 400,
-    "MARUTI": 50,
-    "WIPRO": 1500
-}
+# Fallback basics if json not loaded
+if not INSTRUMENT_MAP:
+    INSTRUMENT_MAP.update({
+        "RELIANCE": "NSE_EQ|INE002A01018",
+        "NIFTY": "NSE_INDEX|Nifty 50",
+        "BANKNIFTY": "NSE_INDEX|Nifty Bank",
+        "POLICYBZR": "NSE_EQ|INE417T01026",
+        "TCS": "NSE_EQ|INE467B01029",
+        "INFY": "NSE_EQ|INE009A01021"
+    })
+    LOT_SIZE_MAP.update({
+        "RELIANCE": 500, "NIFTY": 25, "BANKNIFTY": 15, "POLICYBZR": 350, "TCS": 175, "INFY": 400
+    })
 
 def get_upstox_token() -> str:
     """Reads the Upstox API token from the Desktop txt file."""
