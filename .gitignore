@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+venv/
+
+# Scratch & Temporary
+crop_position.png
+text_contract.png
+*.token
+*Upstox*API*.txt
+*.tmp
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
