@@ -685,8 +685,30 @@
           <div class="card-title">
             <span>Log-Normal Probability Distribution & Risk Range</span>
             <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">
-              Hover crosshair across chart to inspect probability density and prices
+              Hover or scrub crosshair across chart to inspect probability density & P&L
             </span>
+          </div>
+
+          <!-- Chart Visual Legend -->
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; font-size: 11px; align-items: center; background: rgba(15, 23, 42, 0.5); padding: 8px 12px; border-radius: 8px; border: 1px solid #1e293b;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(16, 185, 129, 0.4); border: 1px solid #10b981; display: inline-block;"></span>
+              <span style="color: #34d399; font-weight: 600;">Worthless Zone (Max Profit)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(239, 68, 68, 0.4); border: 1px solid #ef4444; display: inline-block;"></span>
+              <span style="color: #f87171; font-weight: 600;">In-The-Money Zone (Risk / Loss)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 14px; height: 2.5px; background: #38bdf8; display: inline-block; border-radius: 1px;"></span>
+              <span style="color: #93c5fd; font-weight: 600;">Expiry PDF Curve</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+              <span style="color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 700;">Markers:</span>
+              <span style="color: #38bdf8; font-weight: 700;">📍 Spot</span>
+              <span style="color: #fbbf24; font-weight: 700;">🎯 Strike</span>
+              <span style="color: #f43f5e; font-weight: 700;">⚡ Breakeven</span>
+            </div>
           </div>
 
           <div class="chart-container" id="chartContainer">
@@ -1217,6 +1239,7 @@
       const maxProfit = state.isShort ? state.price * state.lotSize : Infinity;
       document.getElementById("dispMaxProfit").innerText = maxProfit === Infinity ? 'Unlimited' : `+₹${maxProfit.toFixed(2)}`;
 
+      lastBreakeven = breakeven;
       renderScenarios(breakeven);
       drawChart(breakeven);
     }
@@ -1272,43 +1295,80 @@
       tbody.innerHTML = html;
     }
 
-    // ACCURATE CHART AXIS & DISTRIBUTION RENDERING
+    // ACCURATE CHART AXIS & DISTRIBUTION RENDERING (COLLISION-FREE)
     let hoverX = null;
+    let lastBreakeven = 0;
+
+    // "Nice numbers" algorithm for clean, professional financial axis ticks
+    function getNiceTicks(minVal, maxVal, targetCount = 6) {
+      const span = maxVal - minVal;
+      if (span <= 0) return [Math.round(minVal)];
+      const roughStep = span / targetCount;
+      const stepPower = Math.pow(10, Math.floor(Math.log10(roughStep)));
+      const stepFraction = roughStep / stepPower;
+
+      let niceFraction = 1;
+      if (stepFraction > 7.5) niceFraction = 10;
+      else if (stepFraction > 3.5) niceFraction = 5;
+      else if (stepFraction > 1.5) niceFraction = 2;
+      else niceFraction = 1;
+
+      const step = niceFraction * stepPower;
+      const firstTick = Math.ceil(minVal / step) * step;
+      const lastTick = Math.floor(maxVal / step) * step;
+
+      const ticks = [];
+      for (let t = firstTick; t <= lastTick + 1e-5; t += step) {
+        ticks.push(Number(t.toFixed(2)));
+      }
+      return ticks;
+    }
+
     function drawChart(breakeven) {
       const canvas = document.getElementById("pdfCanvas");
+      if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      const ctx = canvas.getContext("2d");
-      ctx.scale(dpr, dpr);
+      const width = rect.width || canvas.clientWidth || 600;
+      const height = rect.height || canvas.clientHeight || 340;
 
-      const width = rect.width;
-      const height = rect.height;
+      // Stable canvas sizing without resetting dimensions unnecessarily
+      const targetW = Math.round(width * dpr);
+      const targetH = Math.round(height * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
       const t = Math.max(1e-5, state.dte / 365.0);
-      const v = state.iv * Math.sqrt(t);
+      const v = Math.max(0.005, state.iv * Math.sqrt(t));
 
-      // ENSURE THE X-AXIS FULLY COVERS SPOT, STRIKE, BREAKEVEN, AND ±2 SIGMA MOVES
-      const s2Low = state.spot * Math.exp(-2.2 * v);
-      const s2High = state.spot * Math.exp(2.2 * v);
-      const allPrices = [state.spot, state.strike, breakeven, s2Low, s2High];
-      let minPrice = Math.min(...allPrices) * 0.94;
-      let maxPrice = Math.max(...allPrices) * 1.06;
-      if (maxPrice <= minPrice) maxPrice = minPrice + 100;
-
-      const priceSpan = maxPrice - minPrice;
-      const chartLeft = 50;
-      const chartRight = width - 40;
-      const chartTop = 30;
-      const chartBottom = height - 45;
+      // Margins: ample room at top for tiered badges, room at bottom for round ticks
+      const chartLeft = width < 480 ? 40 : 55;
+      const chartRight = width < 480 ? width - 20 : width - 35;
+      const chartTop = 56;
+      const chartBottom = height - 38;
       const chartW = chartRight - chartLeft;
       const chartH = chartBottom - chartTop;
+
+      // Ensure price span encompasses Spot, Strike, Breakeven, and ±2.4 sigma log-normal distribution
+      const sLow = state.spot * Math.exp(-2.4 * v);
+      const sHigh = state.spot * Math.exp(2.4 * v);
+      const allPrices = [state.spot, state.strike, breakeven, sLow, sHigh];
+      const rawMin = Math.min(...allPrices);
+      const rawMax = Math.max(...allPrices);
+      const pad = (rawMax - rawMin) * 0.08;
+      let minPrice = Math.max(0.01, rawMin - pad);
+      let maxPrice = rawMax + pad;
+      const priceSpan = maxPrice - minPrice;
 
       function pToX(p) { return chartLeft + ((p - minPrice) / priceSpan) * chartW; }
       function xToP(x) { return minPrice + ((x - chartLeft) / chartW) * priceSpan; }
 
+      // Log-normal PDF
       const mu = Math.log(state.spot) + (state.rate - 0.5 * state.iv * state.iv) * t;
       function logPdf(p) {
         if (p <= 0) return 0;
@@ -1316,43 +1376,57 @@
         return (1.0 / (p * v * Math.sqrt(2 * Math.PI))) * Math.exp(-(diff * diff) / (2 * v * v));
       }
 
-      // Generate points
-      const steps = 300;
+      // Generate 400 continuous sample points across chart width
+      const sampleCount = 400;
       const pts = [];
       let maxPdf = 0;
-      for (let i = 0; i <= steps; i++) {
-        const x = chartLeft + (i / steps) * chartW;
+      for (let i = 0; i <= sampleCount; i++) {
+        const x = chartLeft + (i / sampleCount) * chartW;
         const p = xToP(x);
-        const yVal = logPdf(p);
-        if (yVal > maxPdf) maxPdf = yVal;
-        pts.push({ x, price: p, pdf: yVal });
+        const pdfVal = logPdf(p);
+        if (pdfVal > maxPdf) maxPdf = pdfVal;
+        pts.push({ x, price: p, pdf: pdfVal });
       }
-      if (maxPdf === 0) maxPdf = 0.01;
-      function valToY(val) { return chartBottom - (val / (maxPdf * 1.15)) * chartH; }
+      if (maxPdf <= 0) maxPdf = 0.01;
 
-      // 1. Draw Grid Lines & Rounded Numerical X-Axis Ticks
-      ctx.strokeStyle = '#1e293b';
+      // Leave 18% headroom between peak of curve and chartTop so curve never touches top badges
+      function valToY(pdfVal) {
+        return chartBottom - (pdfVal / (maxPdf * 1.20)) * chartH;
+      }
+
+      // 1. Draw Clean Grid Lines & Rounded Numerical X-Axis Ticks
+      const targetTicks = width < 480 ? 4 : 6;
+      const ticks = getNiceTicks(minPrice, maxPrice, targetTicks);
+
       ctx.lineWidth = 1;
-      ctx.font = '10px monospace';
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace';
       ctx.fillStyle = '#64748b';
       ctx.textAlign = 'center';
 
-      const numTicks = 6;
-      for (let i = 0; i <= numTicks; i++) {
-        const tickPrice = minPrice + (i / numTicks) * priceSpan;
-        const xPos = pToX(tickPrice);
+      for (const tick of ticks) {
+        const xPos = pToX(tick);
+        if (xPos < chartLeft + 8 || xPos > chartRight - 8) continue;
 
-        // Vertical grid line
+        // Subtle vertical grid line
+        ctx.strokeStyle = '#1e293b';
         ctx.beginPath();
         ctx.moveTo(xPos, chartTop);
         ctx.lineTo(xPos, chartBottom);
         ctx.stroke();
 
-        // X-axis price label at bottom
-        ctx.fillText(`₹${Math.round(tickPrice)}`, xPos, chartBottom + 16);
+        // Baseline tick pip
+        ctx.strokeStyle = '#334155';
+        ctx.beginPath();
+        ctx.moveTo(xPos, chartBottom);
+        ctx.lineTo(xPos, chartBottom + 4);
+        ctx.stroke();
+
+        // X-axis rounded price label
+        const formattedTick = tick >= 1000 ? `₹${Math.round(tick).toLocaleString('en-IN')}` : `₹${tick}`;
+        ctx.fillText(formattedTick, xPos, chartBottom + 16);
       }
 
-      // Horizontal baseline
+      // Horizontal solid baseline
       ctx.strokeStyle = '#334155';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -1360,54 +1434,49 @@
       ctx.lineTo(chartRight, chartBottom);
       ctx.stroke();
 
-      // 2. Shaded Worthless vs ITM Regions
-      const strikeX = pToX(state.strike);
+      // 2. Smooth Seamless Shading: Worthless (Green) & ITM (Red)
+      const strikeX = Math.max(chartLeft, Math.min(chartRight, pToX(state.strike)));
 
-      // Worthless fill (Green)
-      ctx.save();
-      ctx.beginPath();
-      let started = false;
-      for (let pt of pts) {
-        const isWorthless = (state.optionType === 'call' && pt.price <= state.strike) ||
-                            (state.optionType === 'put' && pt.price >= state.strike);
-        if (isWorthless) {
-          const y = valToY(pt.pdf);
-          if (!started) { ctx.moveTo(pt.x, chartBottom); ctx.lineTo(pt.x, y); started = true; }
-          else ctx.lineTo(pt.x, y);
+      function fillRegion(xStart, xEnd, colorStart, colorEnd) {
+        if (xStart >= xEnd) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(xStart, chartBottom);
+
+        const yStart = valToY(logPdf(xToP(xStart)));
+        ctx.lineTo(xStart, yStart);
+
+        for (let i = 0; i < pts.length; i++) {
+          if (pts[i].x > xStart && pts[i].x < xEnd) {
+            ctx.lineTo(pts[i].x, valToY(pts[i].pdf));
+          }
         }
-      }
-      if (started) {
-        if (state.optionType === 'call') ctx.lineTo(Math.min(strikeX, chartRight), chartBottom);
-        else ctx.lineTo(chartRight, chartBottom);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
-        ctx.fill();
-      }
-      ctx.restore();
 
-      // ITM fill (Red)
+        const yEnd = valToY(logPdf(xToP(xEnd)));
+        ctx.lineTo(xEnd, yEnd);
+        ctx.lineTo(xEnd, chartBottom);
+        ctx.closePath();
+
+        const grad = ctx.createLinearGradient(0, chartTop, 0, chartBottom);
+        grad.addColorStop(0, colorStart);
+        grad.addColorStop(1, colorEnd);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      if (state.optionType === 'put') {
+        // PUT: Loss below Strike (Red), Worthless above Strike (Green)
+        fillRegion(chartLeft, strikeX, 'rgba(239, 68, 68, 0.32)', 'rgba(239, 68, 68, 0.03)');
+        fillRegion(strikeX, chartRight, 'rgba(16, 185, 129, 0.32)', 'rgba(16, 185, 129, 0.03)');
+      } else {
+        // CALL: Worthless below Strike (Green), Loss above Strike (Red)
+        fillRegion(chartLeft, strikeX, 'rgba(16, 185, 129, 0.32)', 'rgba(16, 185, 129, 0.03)');
+        fillRegion(strikeX, chartRight, 'rgba(239, 68, 68, 0.32)', 'rgba(239, 68, 68, 0.03)');
+      }
+
+      // 3. Draw Continuous Probability Distribution Curve Line
       ctx.save();
-      ctx.beginPath();
-      started = false;
-      for (let pt of pts) {
-        const isItm = (state.optionType === 'call' && pt.price > state.strike) ||
-                      (state.optionType === 'put' && pt.price < state.strike);
-        if (isItm) {
-          const y = valToY(pt.pdf);
-          if (!started) { ctx.moveTo(pt.x, chartBottom); ctx.lineTo(pt.x, y); started = true; }
-          else ctx.lineTo(pt.x, y);
-        }
-      }
-      if (started) {
-        if (state.optionType === 'call') ctx.lineTo(chartRight, chartBottom);
-        else ctx.lineTo(Math.min(strikeX, chartRight), chartBottom);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.20)';
-        ctx.fill();
-      }
-      ctx.restore();
-
-      // 3. Draw Probability Curve Line
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -1417,69 +1486,213 @@
         else ctx.lineTo(pts[i].x, y);
       }
       ctx.stroke();
+      ctx.restore();
 
-      // 4. Draw Key Markers (Spot, Strike, Breakeven)
-      function drawPin(xPos, color, text, sub) {
-        if (xPos < chartLeft - 10 || xPos > chartRight + 10) return;
+      // 4. Smart Marker Layout Engine (Spot, Strike, Breakeven)
+      // Solves collision: Staggers overlapping markers across 3 distinct vertical tiers
+      const markers = [
+        {
+          id: 'spot',
+          name: 'Spot',
+          price: state.spot,
+          x: pToX(state.spot),
+          color: '#38bdf8',
+          icon: '📍',
+          dash: [5, 3]
+        },
+        {
+          id: 'strike',
+          name: 'Strike',
+          price: state.strike,
+          x: pToX(state.strike),
+          color: '#fbbf24',
+          icon: '🎯',
+          dash: [4, 4]
+        },
+        {
+          id: 'be',
+          name: 'B/E',
+          price: breakeven,
+          x: pToX(breakeven),
+          color: '#f43f5e',
+          icon: '⚡',
+          dash: [2, 3]
+        }
+      ];
+
+      // Sort markers left to right
+      const sortedM = [...markers].sort((a, b) => a.x - b.x);
+      const tiers = [[], [], []];
+      const minPillGap = 80;
+
+      for (const m of sortedM) {
+        let assigned = false;
+        for (let tIdx = 0; tIdx < 3; tIdx++) {
+          if (!tiers[tIdx].length || (m.x - tiers[tIdx][tiers[tIdx].length - 1].x >= minPillGap)) {
+            m.tier = tIdx;
+            tiers[tIdx].push(m);
+            assigned = true;
+            break;
+          }
+        }
+        if (!assigned) {
+          // If all tiers have something nearby, choose the one farthest away
+          let bestTier = 0;
+          let bestDist = -1;
+          for (let tIdx = 0; tIdx < 3; tIdx++) {
+            const d = m.x - tiers[tIdx][tiers[tIdx].length - 1].x;
+            if (d > bestDist) {
+              bestDist = d;
+              bestTier = tIdx;
+            }
+          }
+          m.tier = bestTier;
+          tiers[bestTier].push(m);
+        }
+      }
+
+      // Draw each marker
+      const tierY = [12, 28, 44]; // Y centers for tiers 0, 1, 2
+
+      for (const m of markers) {
+        if (m.x < chartLeft - 10 || m.x > chartRight + 10) continue;
+
+        // Vertical dashed line from top to bottom
         ctx.save();
-        ctx.strokeStyle = color;
-        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = m.color;
         ctx.lineWidth = 1.5;
+        ctx.setLineDash(m.dash);
         ctx.beginPath();
-        ctx.moveTo(xPos, chartTop);
-        ctx.lineTo(xPos, chartBottom);
+        ctx.moveTo(m.x, chartTop);
+        ctx.lineTo(m.x, chartBottom);
         ctx.stroke();
 
+        // Baseline triangle anchor
         ctx.setLineDash([]);
-        ctx.fillStyle = color;
-        ctx.font = '700 11px -apple-system, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(text, xPos, chartTop - 8);
+        ctx.fillStyle = m.color;
+        ctx.beginPath();
+        ctx.moveTo(m.x, chartBottom);
+        ctx.lineTo(m.x - 3.5, chartBottom + 5);
+        ctx.lineTo(m.x + 3.5, chartBottom + 5);
+        ctx.closePath();
+        ctx.fill();
 
-        ctx.font = '700 10px monospace';
-        ctx.fillText(sub, xPos, chartBottom + 32);
+        // Top Pill Badge
+        const pY = tierY[m.tier];
+        const text = `${m.icon} ${m.name}: ₹${m.price.toFixed(2)}`;
+        ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace';
+        const txtW = ctx.measureText(text).width;
+        const pillW = txtW + 12;
+        const pillH = 16;
+        let pillX = m.x - pillW / 2;
+
+        // Keep pill inside chart left/right bounds
+        pillX = Math.max(chartLeft, Math.min(chartRight - pillW, pillX));
+
+        // Background pill
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+        ctx.strokeStyle = m.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const r = 3;
+        ctx.roundRect ? ctx.roundRect(pillX, pY - pillH / 2, pillW, pillH, r) : ctx.rect(pillX, pY - pillH / 2, pillW, pillH);
+        ctx.fill();
+        ctx.stroke();
+
+        // Text
+        ctx.fillStyle = m.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, pillX + pillW / 2, pY);
+
+        // Leader line connecting pill bottom to chartTop
+        ctx.strokeStyle = m.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(m.x, pY + pillH / 2);
+        ctx.lineTo(m.x, chartTop);
+        ctx.stroke();
+
         ctx.restore();
       }
 
-      drawPin(pToX(state.spot), '#38bdf8', `Spot`, `₹${state.spot.toFixed(0)}`);
-      drawPin(strikeX, '#fbbf24', `Strike`, `₹${state.strike.toFixed(0)}`);
-      drawPin(pToX(breakeven), '#ec4899', `B/E`, `₹${breakeven.toFixed(0)}`);
-
-      // 5. Hover Crosshair Tooltip
+      // 5. Interactive Hover Crosshair & Glassmorphic Tooltip
       if (hoverX !== null && hoverX >= chartLeft && hoverX <= chartRight) {
         const hPrice = xToP(hoverX);
         const hPdf = logPdf(hPrice);
         const hY = valToY(hPdf);
 
+        ctx.save();
+        // Dot on curve
         ctx.fillStyle = '#fff';
         ctx.beginPath();
-        ctx.arc(hoverX, hY, 4, 0, Math.PI * 2);
+        ctx.arc(hoverX, hY, 4.5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        // Vertical hairline
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
         ctx.setLineDash([2, 2]);
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(hoverX, chartTop);
         ctx.lineTo(hoverX, chartBottom);
         ctx.stroke();
+        ctx.restore();
 
-        const isW = (state.optionType === 'call' && hPrice <= state.strike) || (state.optionType === 'put' && hPrice >= state.strike);
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-        ctx.strokeStyle = '#334155';
-        ctx.setLineDash([]);
-        const boxX = hoverX > width - 150 ? hoverX - 140 : hoverX + 12;
-        const boxY = Math.max(chartTop, hY - 30);
-        ctx.fillRect(boxX, boxY, 130, 44);
-        ctx.strokeRect(boxX, boxY, 130, 44);
+        // Tooltip Box
+        const isWorthless = (state.optionType === 'call' && hPrice <= state.strike) ||
+                            (state.optionType === 'put' && hPrice >= state.strike);
 
-        ctx.fillStyle = '#fff';
-        ctx.font = '700 11px monospace';
+        const diffFromSpot = ((hPrice - state.spot) / state.spot) * 100;
+        let intrinsic = 0;
+        if (state.optionType === 'call') intrinsic = Math.max(0, hPrice - state.strike);
+        else intrinsic = Math.max(0, state.strike - hPrice);
+
+        const tipW = 160;
+        const tipH = 50;
+        let tipX = hoverX > width - 180 ? hoverX - tipW - 12 : hoverX + 12;
+        let tipY = Math.max(chartTop + 5, Math.min(chartBottom - tipH - 5, hY - 25));
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(11, 17, 32, 0.95)';
+        ctx.strokeStyle = isWorthless ? '#10b981' : '#ef4444';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(tipX, tipY, tipW, tipH, 6);
+        else ctx.rect(tipX, tipY, tipW, tipH);
+        ctx.fill();
+        ctx.stroke();
+
         ctx.textAlign = 'left';
-        ctx.fillText(`₹${hPrice.toFixed(2)}`, boxX + 8, boxY + 16);
+        ctx.textBaseline = 'top';
 
-        ctx.fillStyle = isW ? '#34d399' : '#f87171';
+        // Price & % from Spot
+        ctx.font = '700 11px monospace';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`₹${hPrice.toFixed(2)} (${diffFromSpot >= 0 ? '+' : ''}${diffFromSpot.toFixed(1)}%)`, tipX + 8, tipY + 8);
+
+        // Status & Outcome
         ctx.font = '600 10px -apple-system, sans-serif';
-        ctx.fillText(isW ? 'Worthless (OTM)' : 'In-The-Money (ITM)', boxX + 8, boxY + 34);
+        if (isWorthless) {
+          ctx.fillStyle = '#34d399';
+          ctx.fillText(`✓ Worthless (Full Profit)`, tipX + 8, tipY + 24);
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '9px monospace';
+          ctx.fillText(`Max P&L: +₹${(state.price * state.lotSize).toFixed(0)}`, tipX + 8, tipY + 37);
+        } else {
+          ctx.fillStyle = '#f87171';
+          ctx.fillText(`✗ In-The-Money (ITM)`, tipX + 8, tipY + 24);
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '9px monospace';
+          const itmPnl = state.isShort 
+            ? (state.price - intrinsic) * state.lotSize 
+            : (intrinsic - state.price) * state.lotSize;
+          ctx.fillText(`P&L: ${itmPnl >= 0 ? '+' : ''}₹${itmPnl.toFixed(0)} (Int: ₹${intrinsic.toFixed(1)})`, tipX + 8, tipY + 37);
+        }
+        ctx.restore();
       }
     }
 
@@ -1508,11 +1721,22 @@
       container.addEventListener("mousemove", (e) => {
         const rect = canvas.getBoundingClientRect();
         hoverX = e.clientX - rect.left;
-        recalc();
+        drawChart(lastBreakeven);
       });
       container.addEventListener("mouseleave", () => {
         hoverX = null;
-        recalc();
+        drawChart(lastBreakeven);
+      });
+      container.addEventListener("touchmove", (e) => {
+        if (e.touches && e.touches[0]) {
+          const rect = canvas.getBoundingClientRect();
+          hoverX = e.touches[0].clientX - rect.left;
+          drawChart(lastBreakeven);
+        }
+      }, { passive: true });
+      container.addEventListener("touchend", () => {
+        hoverX = null;
+        drawChart(lastBreakeven);
       });
       window.addEventListener("resize", () => recalc());
 

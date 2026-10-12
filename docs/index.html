@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Options Probability & Risk Analytics Dashboard</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #101726;
+      --card-border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.25);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.25);
+      --warning: #f59e0b;
+      --accent: #8b5cf6;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 20px 16px;
+    }
+
+    .container { max-width: 1360px; margin: 0 auto; }
+
+    header {
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-sub {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-green {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge-blue {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .badge-amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* Exact Ticker Search Bar */
+    .nl-search-card {
+      background: linear-gradient(135deg, #131d33, #0f172a);
+      border: 1px solid #2d3e63;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .nl-input-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .nl-input {
+      flex: 1;
+      background: #1a2744;
+      border: 1px solid #3b4d75;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 14px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .nl-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+    .btn-action {
+      background: var(--primary);
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-action:hover { background: var(--primary-hover); }
+
+    /* Recent Trades Chips */
+    .recent-trades-container {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .recent-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chip:hover {
+      background: #27354f;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+    .chip b { color: #60a5fa; }
+    .chip-del {
+      color: #64748b;
+      font-weight: bold;
+      font-size: 12px;
+      margin-left: 2px;
+    }
+    .chip-del:hover { color: #f87171; }
+
+    /* Grid Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 1024px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Form Inputs */
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+    .form-label span.val {
+      font-family: var(--font-mono);
+      color: #fff;
+    }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      background: #172136;
+      border: 1px solid #28354f;
+      border-radius: 6px;
+      padding: 7px 10px;
+      color: #fff;
+      font-size: 13px;
+      font-family: var(--font-mono);
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 5px;
+      border-radius: 4px;
+      background: #28354f;
+      outline: none;
+      margin-top: 6px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+
+    .toggle-group {
+      display: flex;
+      border-radius: 6px;
+      background: #172136;
+      padding: 2px;
+      border: 1px solid #28354f;
+    }
+    .toggle-btn {
+      flex: 1;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .toggle-btn.active-call { background: #10b981; color: #fff; }
+    .toggle-btn.active-put { background: #ef4444; color: #fff; }
+    .toggle-btn.active-blue { background: var(--primary); color: #fff; }
+
+    /* Live Position Header Banner */
+    .pos-banner {
+      background: #131c2e;
+      border: 1px solid #243350;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .pos-name {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pos-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+    }
+    .pos-stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .pos-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .pos-stat-val {
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* Hero Probability Cards */
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .metric-card {
+      background: #131c2e;
+      border: 1px solid #22314d;
+      border-radius: 10px;
+      padding: 16px;
+      position: relative;
+    }
+    .metric-card.hero {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.9));
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 20px var(--success-glow);
+    }
+    .metric-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .metric-val {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      line-height: 1.1;
+    }
+    .metric-card.hero .metric-val { color: #34d399; }
+    .metric-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .progress-bar {
+      height: 5px;
+      background: #1e293b;
+      border-radius: 99px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.3s;
+    }
+
+    /* Greeks Grid */
+    .greeks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .greek-box {
+      background: #162238;
+      border: 1px solid #233352;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .greek-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .greek-val {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    /* Scenarios Table */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      text-align: right;
+    }
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #1e293b;
+    }
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 10px;
+      background: #0d1424;
+    }
+    td.text-left, th.text-left { text-align: left; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    /* Chart Canvas */
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 340px;
+      background: #0c1220;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-box {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+    }
+
+    .loading-pulse {
+      animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Top Header -->
+    <header>
+      <div>
+        <div class="header-title">
+          <span>⚡</span> Options Probability & Risk Analytics Dashboard
+        </div>
+        <div class="header-sub">
+          Universal multi-stock Black-Scholes analytics with direct live Upstox API feed
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="btn-action" style="background: #1e293b; border: 1px solid #334155;" onclick="openTokenModal()">
+          🔑 API Token Settings
+        </button>
+        <span class="badge badge-green" id="tokenBadge">Live Mode</span>
+      </div>
+    </header>
+
+    <!-- Exact Ticker Input Bar -->
+    <div class="nl-search-card">
+      <div style="font-size: 12px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center;">
+        <span>🎯 Exact Contract Ticker (Format: SYMBOL EXPIRY STRIKE TYPE [STANCE] [PRICE])</span>
+        <span id="fetchStatus" style="font-size: 11px; color: #34d399; font-weight: 600;">Ready</span>
+      </div>
+      <div class="nl-input-row">
+        <input 
+          type="text" 
+          id="tickerInput" 
+          class="nl-input" 
+          placeholder="e.g. POLICYBZR 27 OCT 860 PUT SHORT 2.0  or  RELIANCE 27 OCT 1140 PUT SHORT 3.35"
+          value="POLICYBZR 27 OCT 860 PUT SHORT 2.0"
+          onkeydown="if(event.key==='Enter') executeTickerSearch()"
+        >
+        <button class="btn-action" onclick="executeTickerSearch()" id="btnAnalyze">
+          ⚡ Analyze Ticker
+        </button>
+      </div>
+
+      <!-- Remembered Last 5 Trades -->
+      <div class="recent-trades-container">
+        <span class="recent-label">🕒 Recent Trades (Last 5):</span>
+        <div id="recentChips" style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <!-- Dynamically populated from localStorage -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid">
+      <!-- Left Column: Input Form Controls -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <span>Contract Parameters</span>
+            <button class="chip" onclick="fetchLiveMarket()" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4);">
+              🔄 Refresh Market
+            </button>
+          </div>
+
+          <!-- Symbol & Expiry -->
+          <div class="form-group">
+            <label class="form-label">Symbol (220+ NSE F&O Stocks)</label>
+            <input type="text" id="ctrlSymbol" value="POLICYBZR" style="font-weight: 700; text-transform: uppercase;" onchange="onManualSymbolChange()">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Expiry Date</label>
+            <select id="ctrlExpiry" onchange="fetchLiveMarket()">
+              <option value="2026-10-27" selected>2026-10-27 (15 DTE)</option>
+              <option value="2026-11-23">2026-11-23 (42 DTE)</option>
+              <option value="2026-12-29">2026-12-29 (78 DTE)</option>
+            </select>
+          </div>
+
+          <!-- Strike Price -->
+          <div class="form-group">
+            <div class="form-label">
+              <span>Strike Price</span>
+              <span id="strikeTxt" class="val">₹860.00</span>
+            </div>
+            <input type="number" id="ctrlStrike" step="5" value="860" onchange="fetchLiveMarket()">
+          </div>
+
+          <!-- Type: Call / Put -->
+          <div class="form-group">
+            <label class="form-label">Option Type</label>
+            <div class="toggle-group">
+              <button id="btnCall" class="toggle-btn" onclick="setOptionType('call')">CALL (CE)</button>
+              <button id="btnPut" class="toggle-btn active-put" onclick="setOptionType('put')">PUT (PE)</button>
+            </div>
+          </div>
+
+          <!-- Trading Stance: Short / Long -->
+          <div class="form-group">
+            <label class="form-label">Position Stance</label>
+            <div class="toggle-group">
+              <button id="btnShort" class="toggle-btn active-blue" onclick="setStance(true)">SHORT / SELLER (Credit)</button>
+              <button id="btnLong" class="toggle-btn" onclick="setStance(false)">LONG / BUYER (Debit)</button>
+            </div>
+          </div>
+
+          <!-- Price & Lot Size -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label">Entry / Sold Price (₹)</label>
+              <input type="number" id="ctrlPrice" step="0.05" value="2.00" oninput="recalc()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lot Size (Qty)</label>
+              <input type="number" id="ctrlLotSize" value="350" oninput="recalc()">
+            </div>
+          </div>
+
+          <!-- Underlying Spot & IV Adjustment Sliders -->
+          <div class="form-group">
+            <div class="form-label">
+              <span>Underlying Spot Price</span>
+              <span id="spotTxt" class="val">₹1,047.00</span>
+            </div>
+            <input type="number" id="ctrlSpot" step="0.5" value="1047.00" oninput="syncManualSpot(this.value)">
+            <input type="range" id="spotSlider" min="200" max="3000" step="1" value="1047" oninput="syncManualSpot(this.value)">
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">
+              <span>Implied Volatility (IV %)</span>
+              <span id="ivTxt" class="val">64.7%</span>
+            </div>
+            <input type="number" id="ctrlIv" step="0.1" value="64.7" oninput="syncManualIv(this.value)">
+            <input type="range" id="ivSlider" min="5" max="150" step="0.5" value="64.7" oninput="syncManualIv(this.value)">
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">
+              <span>Days to Expiration (DTE)</span>
+              <span id="dteTxt" class="val">15.0 days</span>
+            </div>
+            <input type="number" id="ctrlDte" value="15.0" step="0.5" oninput="syncManualDte(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Live Analysis & Dashboard Outputs -->
+      <div>
+        <!-- Live Position Header Banner -->
+        <div class="pos-banner">
+          <div>
+            <div class="pos-name">
+              <span id="dispContractTag" style="padding: 2px 8px; border-radius: 4px; font-size: 13px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">
+                POLICYBZR 860 PE
+              </span>
+              <span id="dispPositionBadge" class="badge badge-green">SHORT (1 Lot / 350 Qty)</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="dispBufferDesc">
+              Spot is ₹187.00 (+17.86%) above strike &bull; Deep Out-Of-The-Money (OTM)
+            </div>
+          </div>
+
+          <div class="pos-stats">
+            <div class="pos-stat-item">
+              <span class="pos-stat-label">Live Spot Price</span>
+              <span class="pos-stat-val" id="dispSpot">₹1,047.00</span>
+            </div>
+            <div class="pos-stat-item">
+              <span class="pos-stat-label">Market LTP</span>
+              <span class="pos-stat-val" style="color: #fbbf24;" id="dispLtp">₹3.50</span>
+            </div>
+            <div class="pos-stat-item">
+              <span class="pos-stat-label">Entry Avg</span>
+              <span class="pos-stat-val" id="dispEntry">₹2.00</span>
+            </div>
+            <div class="pos-stat-item">
+              <span class="pos-stat-label">Unrealized P&L</span>
+              <span class="pos-stat-val" id="dispPnl" style="color: #f87171;">-₹525.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Probability Metrics Grid -->
+        <div class="hero-metrics">
+          <!-- Probability Expiring Worthless -->
+          <div class="metric-card hero">
+            <div class="metric-title">Prob Expiring Worthless (PoW)</div>
+            <div class="metric-val" id="powDisplay">92.73%</div>
+            <div class="metric-desc" id="powDesc">If Spot ≥ ₹860.00 at expiry</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="powBar" style="width: 92.73%; background: #10b981;"></div>
+            </div>
+          </div>
+
+          <!-- Probability of Profit -->
+          <div class="metric-card">
+            <div class="metric-title">Prob of Profit (PoP)</div>
+            <div class="metric-val" id="popDisplay" style="color: #60a5fa;">92.97%</div>
+            <div class="metric-desc" id="popDesc">Breakeven: ₹858.00</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="popBar" style="width: 92.97%; background: #3b82f6;"></div>
+            </div>
+          </div>
+
+          <!-- Probability of Touch -->
+          <div class="metric-card">
+            <div class="metric-title">Prob of Touch (PoT)</div>
+            <div class="metric-val" id="potDisplay" style="color: #f59e0b;">14.27%</div>
+            <div class="metric-desc">Likelihood price touches strike</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="potBar" style="width: 14.27%; background: #f59e0b;"></div>
+            </div>
+          </div>
+
+          <!-- Delta Proxy -->
+          <div class="metric-card">
+            <div class="metric-title">Delta Proxy (1 - |Δ|)</div>
+            <div class="metric-val" id="deltaProxyDisplay" style="color: #a78bfa;">94.37%</div>
+            <div class="metric-desc" id="deltaProxyDesc">Delta: -0.056</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="deltaProxyBar" style="width: 94.37%; background: #8b5cf6;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Probability Distribution Chart -->
+        <div class="card">
+          <div class="card-title">
+            <span>Log-Normal Probability Distribution & Risk Range</span>
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">
+              Hover or scrub crosshair across chart to inspect probability density & P&L
+            </span>
+          </div>
+
+          <!-- Chart Visual Legend -->
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; font-size: 11px; align-items: center; background: rgba(15, 23, 42, 0.5); padding: 8px 12px; border-radius: 8px; border: 1px solid #1e293b;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(16, 185, 129, 0.4); border: 1px solid #10b981; display: inline-block;"></span>
+              <span style="color: #34d399; font-weight: 600;">Worthless Zone (Max Profit)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(239, 68, 68, 0.4); border: 1px solid #ef4444; display: inline-block;"></span>
+              <span style="color: #f87171; font-weight: 600;">In-The-Money Zone (Risk / Loss)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 14px; height: 2.5px; background: #38bdf8; display: inline-block; border-radius: 1px;"></span>
+              <span style="color: #93c5fd; font-weight: 600;">Expiry PDF Curve</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+              <span style="color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 700;">Markers:</span>
+              <span style="color: #38bdf8; font-weight: 700;">📍 Spot</span>
+              <span style="color: #fbbf24; font-weight: 700;">🎯 Strike</span>
+              <span style="color: #f43f5e; font-weight: 700;">⚡ Breakeven</span>
+            </div>
+          </div>
+
+          <div class="chart-container" id="chartContainer">
+            <canvas id="pdfCanvas"></canvas>
+          </div>
+
+          <!-- Greeks Grid -->
+          <div class="greeks-grid">
+            <div class="greek-box">
+              <div class="greek-label">Delta (Δ)</div>
+              <div class="greek-val" id="gDelta">-0.0563</div>
+            </div>
+            <div class="greek-box">
+              <div class="greek-label">Gamma (Γ)</div>
+              <div class="greek-val" id="gGamma">0.0008</div>
+            </div>
+            <div class="greek-box">
+              <div class="greek-label">Daily Theta (Lot)</div>
+              <div class="greek-val" id="gThetaLot" style="color: #34d399;">+₹177.45/d</div>
+            </div>
+            <div class="greek-box">
+              <div class="greek-label">Vega (ν) / 1% IV</div>
+              <div class="greek-val" id="gVega">₹0.2404</div>
+            </div>
+            <div class="greek-box">
+              <div class="greek-label">Max Profit</div>
+              <div class="greek-val" id="dispMaxProfit" style="color: #34d399;">+₹700.00</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expiration P&L Scenarios Matrix -->
+        <div class="card">
+          <div class="card-title">
+            <span>Expiration P&L Scenarios</span>
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">
+              Payoff evaluated at expiration for 1 Lot
+            </span>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th class="text-left">Market Scenario</th>
+                  <th>Expiration Spot</th>
+                  <th>Buffer from Spot</th>
+                  <th>Option Intrinsic</th>
+                  <th>Total P&L</th>
+                  <th class="text-left">Outcome</th>
+                </tr>
+              </thead>
+              <tbody id="scenarioTableBody">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Token Modal -->
+  <div class="modal-backdrop" id="tokenModal">
+    <div class="modal-box">
+      <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+        🔑 Upstox API Token Configuration
+      </h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+        Enter your Upstox Bearer token below. It is saved in your device's private browser <code>localStorage</code> so your hosted GitHub Pages site can fetch live quotes directly.
+      </p>
+      <input type="text" id="tokenInput" placeholder="eyJ0eXAi..." style="width: 100%; margin-bottom: 16px;">
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="chip" onclick="closeTokenModal()">Cancel</button>
+        <button class="btn-action" onclick="saveToken()">Save Token</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load 220 F&O Instruments Map -->
+  <script src="fno_instruments.js"></script>
+
+  <script>
+    // Math Utilities
+    function erf(x) {
+      const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+      const sign = x < 0 ? -1 : 1;
+      const absX = Math.abs(x);
+      const t = 1.0 / (1.0 + p * absX);
+      const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-absX * absX);
+      return sign * y;
+    }
+    function normCdf(x) { return 0.5 * (1.0 + erf(x / Math.SQRT2)); }
+    function normPdf(x) { return Math.exp(-0.5 * x * x) / Math.sqrt(2.0 * Math.PI); }
+
+    // Active Upstox Bearer Token (Pre-loaded so it always syncs live automatically)
+    const DEFAULT_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3NUJXTTQiLCJqdGkiOiI2YWNjYWVkZWQ1Y2UyZjZjZDAyYzcxMGIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlzRXh0ZW5kZWQiOnRydWUsImlhdCI6MTc5MTc5OTAwNiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxODIzMzc4NDAwfQ.IjmWM58FA0PRtUW-tWJQI3EXEWp8cTJ52PxKOd5DhbU";
+
+    // Fallback FNO map if js file didn't load
+    const FNO = (typeof FNO_INSTRUMENTS !== 'undefined') ? FNO_INSTRUMENTS : {
+      "RELIANCE": { "instrument_key": "NSE_EQ|INE002A01018", "lot_size": 500 },
+      "POLICYBZR": { "instrument_key": "NSE_EQ|INE417T01026", "lot_size": 350 },
+      "NIFTY": { "instrument_key": "NSE_INDEX|Nifty 50", "lot_size": 25 },
+      "BANKNIFTY": { "instrument_key": "NSE_INDEX|Nifty Bank", "lot_size": 15 },
+      "TCS": { "instrument_key": "NSE_EQ|INE467B01029", "lot_size": 175 },
+      "INFY": { "instrument_key": "NSE_EQ|INE009A01021", "lot_size": 400 }
+    };
+
+    // State
+    const state = {
+      symbol: "RELIANCE",
+      strike: 1140.0,
+      optionType: "put",
+      isShort: true,
+      price: 3.35,
+      lotSize: 500,
+      spot: 1158.90,
+      iv: 0.249,
+      dte: 15.0,
+      rate: 0.0675,
+      ltp: 13.90,
+      token: DEFAULT_TOKEN
+    };
+
+    // Recent Trades Memory (Last 5)
+    const DEFAULT_TRADES = [
+      "POLICYBZR 27 OCT 860 PUT SHORT 2.0",
+      "RELIANCE 27 OCT 1140 PUT SHORT 3.35",
+      "NIFTY 27 OCT 22400 CE",
+      "BANKNIFTY 27 OCT 48000 PE",
+      "TCS 27 OCT 3900 PE"
+    ];
+
+    function getRecentTrades() {
+      try {
+        const raw = localStorage.getItem("options_recent_trades");
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return DEFAULT_TRADES;
+    }
+
+    function addRecentTrade(tickerStr) {
+      let list = getRecentTrades();
+      // Remove if already exists
+      list = list.filter(t => t.toUpperCase() !== tickerStr.toUpperCase());
+      // Prepend to top
+      list.unshift(tickerStr);
+      // Keep only 5
+      list = list.slice(0, 5);
+      try {
+        localStorage.setItem("options_recent_trades", JSON.stringify(list));
+      } catch (e) {}
+      renderRecentChips();
+    }
+
+    function removeRecentTrade(idx, e) {
+      if (e) e.stopPropagation();
+      let list = getRecentTrades();
+      list.splice(idx, 1);
+      try {
+        localStorage.setItem("options_recent_trades", JSON.stringify(list));
+      } catch (e) {}
+      renderRecentChips();
+    }
+
+    function renderRecentChips() {
+      const container = document.getElementById("recentChips");
+      const list = getRecentTrades();
+      container.innerHTML = list.map((trade, idx) => `
+        <button class="chip" onclick="applyRecentTrade('${trade}')">
+          <span>${trade}</span>
+          <span class="chip-del" onclick="removeRecentTrade(${idx}, event)" title="Remove">✕</span>
+        </button>
+      `).join("");
+    }
+
+    function applyRecentTrade(trade) {
+      document.getElementById("tickerInput").value = trade;
+      executeTickerSearch();
+    }
+
+    // Exact Ticker Parser
+    function parseExactTicker(text) {
+      text = text.trim();
+      const expMatch = text.match(/\b(\d{1,2})\s*[- ]\s*([A-Za-z]{3})\b/i);
+      let expDay = null, expMonth = null, expStr = null;
+      let cleaned = text;
+      if (expMatch) {
+        expDay = parseInt(expMatch[1], 10);
+        expMonth = expMatch[2].toUpperCase();
+        expStr = `${expDay} ${expMonth}`;
+        cleaned = text.slice(0, expMatch.index) + ' ' + text.slice(expMatch.index + expMatch[0].length);
+      }
+
+      const optType = /\b(put|pe)\b/i.test(cleaned) ? 'put' : (/\b(call|ce)\b/i.test(cleaned) ? 'call' : 'put');
+      const isShort = !(/\b(long|buy)\b/i.test(cleaned));
+
+      const words = cleaned.trim().split(/\s+/);
+      let symbol = state.symbol;
+      for (const w of words) {
+        if (/^[A-Za-z0-9_-]+$/.test(w) && !['PUT', 'PE', 'CALL', 'CE', 'SHORT', 'SELL', 'LONG', 'BUY', 'LOT'].includes(w.toUpperCase())) {
+          symbol = w.toUpperCase();
+          break;
+        }
+      }
+
+      const numMatches = cleaned.match(/\b\d+(?:\.\d+)?\b/g);
+      let strike = state.strike;
+      let price = null;
+      if (numMatches && numMatches.length > 0) {
+        const nums = numMatches.map(Number).sort((a,b) => a - b);
+        if (nums.length === 1) {
+          strike = nums[0];
+        } else {
+          strike = nums[nums.length - 1]; // largest is strike
+          price = nums[0];               // smaller is entry price
+        }
+      }
+
+      return { symbol, expDay, expMonth, expStr, strike, optType, isShort, price };
+    }
+
+    function executeTickerSearch() {
+      const q = document.getElementById("tickerInput").value.trim();
+      if (!q) return;
+
+      const p = parseExactTicker(q);
+      state.symbol = p.symbol;
+      document.getElementById("ctrlSymbol").value = p.symbol;
+
+      // Update lot size from FNO database
+      if (FNO[p.symbol]) {
+        state.lotSize = FNO[p.symbol].lot_size || 500;
+        document.getElementById("ctrlLotSize").value = state.lotSize;
+      }
+
+      state.strike = p.strike;
+      document.getElementById("ctrlStrike").value = p.strike;
+
+      setOptionType(p.optType);
+      setStance(p.isShort);
+
+      if (p.price !== null) {
+        state.price = p.price;
+        document.getElementById("ctrlPrice").value = p.price;
+      }
+
+      // Add to recent trades (save as normalized ticker)
+      const expStrDisplay = p.expStr || "27 OCT";
+      const normalizedTrade = `${p.symbol} ${expStrDisplay} ${p.strike} ${p.optType.toUpperCase()} ${p.isShort ? 'SHORT' : 'LONG'}${p.price ? ' ' + p.price : ''}`;
+      addRecentTrade(normalizedTrade);
+
+      fetchLiveMarket();
+    }
+
+    function setOptionType(type) {
+      state.optionType = type;
+      document.getElementById("btnCall").className = type === 'call' ? 'toggle-btn active-call' : 'toggle-btn';
+      document.getElementById("btnPut").className = type === 'put' ? 'toggle-btn active-put' : 'toggle-btn';
+      recalc();
+    }
+
+    function setStance(isShort) {
+      state.isShort = isShort;
+      document.getElementById("btnShort").className = isShort ? 'toggle-btn active-blue' : 'toggle-btn';
+      document.getElementById("btnLong").className = !isShort ? 'toggle-btn active-blue' : 'toggle-btn';
+      recalc();
+    }
+
+    function onManualSymbolChange() {
+      const val = document.getElementById("ctrlSymbol").value.trim().toUpperCase();
+      if (val) {
+        state.symbol = val;
+        if (FNO[val]) {
+          state.lotSize = FNO[val].lot_size || 500;
+          document.getElementById("ctrlLotSize").value = state.lotSize;
+        }
+        fetchLiveMarket();
+      }
+    }
+
+    function syncManualSpot(val) {
+      state.spot = parseFloat(val);
+      document.getElementById("ctrlSpot").value = state.spot;
+      document.getElementById("spotSlider").value = state.spot;
+      recalc();
+    }
+
+    function syncManualIv(val) {
+      state.iv = parseFloat(val) / 100.0;
+      document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
+      document.getElementById("ivSlider").value = (state.iv * 100).toFixed(1);
+      recalc();
+    }
+
+    function syncManualDte(val) {
+      state.dte = Math.max(0.1, parseFloat(val));
+      document.getElementById("ctrlDte").value = state.dte;
+      recalc();
+    }
+
+    // Direct Upstox API Fetching (Works on both GitHub Pages & Localhost)
+    async function fetchLiveMarket(forceSpotUpdate = true) {
+      const sym = state.symbol.toUpperCase();
+      const strike = parseFloat(document.getElementById("ctrlStrike").value) || state.strike;
+      state.strike = strike;
+      const optType = state.optionType;
+      const token = localStorage.getItem("upstox_token") || state.token || DEFAULT_TOKEN;
+      const statusEl = document.getElementById("fetchStatus");
+
+      statusEl.innerText = `Fetching ${sym} live data...`;
+      statusEl.className = "loading-pulse";
+
+      // 1. Try local backend server first (if running python serve.py)
+      try {
+        const resp = await fetch(`/api/upstox/analyze?symbol=${sym}&strike=${strike}&type=${optType}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === 'success') {
+            applyMarketData(data.market, forceSpotUpdate);
+            statusEl.innerText = `Live Connected (Local Server)`;
+            statusEl.className = "";
+            return;
+          }
+        }
+      } catch (e) {
+        // Fallback to client-side direct Upstox API request (GitHub Pages mode)
+      }
+
+      // 2. Direct client-side Upstox API call
+      try {
+        const fnoInfo = FNO[sym];
+        const instKey = fnoInfo ? fnoInfo.instrument_key : `NSE_EQ|${sym}`;
+        const headers = {
+          "Accept": "application/json",
+          "Authorization": `Bearer ${token}`
+        };
+
+        // Fetch expiries
+        const expResp = await fetch(`https://api.upstox.com/v2/option/contract?instrument_key=${encodeURIComponent(instKey)}`, { headers });
+        const expData = await expResp.json();
+        const contracts = expData.data || [];
+        const expiries = Array.from(new Set(contracts.map(c => c.expiry))).sort();
+
+        // Match selected expiry or target expiry if available
+        let currentSelectedExp = document.getElementById("ctrlExpiry").value;
+        let expiryDate = expiries[0] || "2026-10-27";
+        if (currentSelectedExp && expiries.includes(currentSelectedExp)) {
+          expiryDate = currentSelectedExp;
+        } else if (expiries.includes("2026-10-27")) {
+          expiryDate = "2026-10-27";
+        }
+
+        // Populate expiry dropdown
+        const expSelect = document.getElementById("ctrlExpiry");
+        expSelect.innerHTML = expiries.slice(0, 8).map(e => `<option value="${e}" ${e === expiryDate ? 'selected' : ''}>${e}</option>`).join("");
+
+        // Fetch option chain
+        const chainResp = await fetch(`https://api.upstox.com/v2/option/chain?instrument_key=${encodeURIComponent(instKey)}&expiry_date=${expiryDate}`, { headers });
+        const chainData = await chainResp.json();
+        const chain = chainData.data || [];
+
+        // Find target strike
+        let target = chain.find(c => Math.abs(c.strike_price - strike) < 0.1);
+        if (!target && chain.length > 0) {
+          target = chain.reduce((prev, curr) => Math.abs(curr.strike_price - strike) < Math.abs(prev.strike_price - strike) ? curr : prev);
+        }
+
+        if (target) {
+          const spot = target.underlying_spot_price;
+          const opt = (optType === 'put') ? target.put_options : target.call_options;
+          const mkt = opt.market_data || {};
+          const greeks = opt.option_greeks || {};
+
+          // Calculate DTE
+          const expD = new Date(expiryDate);
+          const today = new Date();
+          const dteDays = Math.max(0.5, (expD - today) / (1000 * 60 * 60 * 24));
+
+          applyMarketData({
+            spot: spot,
+            ltp: mkt.ltp,
+            iv: greeks.iv,
+            dte_days: dteDays,
+            lot_size: fnoInfo ? fnoInfo.lot_size : state.lotSize
+          }, forceSpotUpdate);
+
+          statusEl.innerText = `Live Connected (Spot: ₹${spot.toFixed(2)} | LTP: ₹${(mkt.ltp || state.ltp).toFixed(2)})`;
+          statusEl.className = "";
+        } else {
+          statusEl.innerText = `Strike ${strike} not in chain`;
+          statusEl.className = "";
+          recalc();
+        }
+      } catch (err) {
+        console.warn("Direct Upstox fetch error:", err);
+        statusEl.innerText = `Error: ${err.message || 'Token expired or network error'}`;
+        statusEl.className = "";
+        recalc();
+      }
+    }
+
+    function applyMarketData(m, forceSpotUpdate = true) {
+      if (m.spot && (forceSpotUpdate || !state.spot)) {
+        state.spot = m.spot;
+        document.getElementById("ctrlSpot").value = state.spot;
+        document.getElementById("spotSlider").value = state.spot;
+        document.getElementById("spotSlider").min = Math.round(state.spot * 0.4);
+        document.getElementById("spotSlider").max = Math.round(state.spot * 1.8);
+      }
+      if (m.ltp !== undefined && m.ltp !== null) {
+        state.ltp = m.ltp;
+      }
+      if (m.iv) {
+        state.iv = m.iv / 100.0;
+        document.getElementById("ctrlIv").value = (state.iv * 100).toFixed(1);
+        document.getElementById("ivSlider").value = (state.iv * 100).toFixed(1);
+      }
+      if (m.dte_days) {
+        state.dte = m.dte_days;
+        document.getElementById("ctrlDte").value = state.dte.toFixed(1);
+      }
+      if (m.lot_size) {
+        state.lotSize = m.lot_size;
+        document.getElementById("ctrlLotSize").value = state.lotSize;
+      }
+
+      recalc();
+    }
+
+    // Core Calculations & Visual Updates
+    function recalc() {
+      state.price = parseFloat(document.getElementById("ctrlPrice").value) || 0.01;
+      state.lotSize = parseInt(document.getElementById("ctrlLotSize").value) || 1;
+      state.strike = parseFloat(document.getElementById("ctrlStrike").value) || 100;
+
+      const t = Math.max(1e-5, state.dte / 365.0);
+      const sigmaSqrtT = state.iv * Math.sqrt(t);
+      const d1 = (Math.log(state.spot / state.strike) + (state.rate + 0.5 * state.iv * state.iv) * t) / sigmaSqrtT;
+      const d2 = d1 - sigmaSqrtT;
+      const dfR = Math.exp(-state.rate * t);
+
+      // Probabilities
+      let pItm = (state.optionType === 'call') ? normCdf(d2) : normCdf(-d2);
+      let pow = 1.0 - pItm;
+
+      // Breakeven & PoP
+      let breakeven = (state.optionType === 'call') 
+        ? state.strike + state.price 
+        : Math.max(0.01, state.strike - state.price);
+
+      let beD2 = (Math.log(state.spot / breakeven) + (state.rate - 0.5 * state.iv * state.iv) * t) / sigmaSqrtT;
+      let pop = (state.optionType === 'call')
+        ? (state.isShort ? (1.0 - normCdf(beD2)) : normCdf(beD2))
+        : (state.isShort ? normCdf(beD2) : (1.0 - normCdf(beD2)));
+      pop = Math.max(0, Math.min(1, pop));
+
+      // PoT
+      let pot = Math.min(1.0, 2.0 * pItm);
+
+      // Greeks
+      let pdfD1 = normPdf(d1);
+      let delta = (state.optionType === 'call') ? normCdf(d1) : -normCdf(-d1);
+      let gamma = pdfD1 / (state.spot * state.iv * Math.sqrt(t));
+      let thetaAnnual = (state.optionType === 'call')
+        ? -(state.spot * pdfD1 * state.iv)/(2 * Math.sqrt(t)) - state.rate * state.strike * dfR * normCdf(d2)
+        : -(state.spot * pdfD1 * state.iv)/(2 * Math.sqrt(t)) + state.rate * state.strike * dfR * normCdf(-d2);
+      let thetaDaily = thetaAnnual / 365.0;
+      let thetaLot = thetaDaily * state.lotSize * (state.isShort ? -1 : 1);
+      let vega = (state.spot * Math.sqrt(t) * pdfD1) / 100.0;
+
+      // Header Banner UI
+      document.getElementById("dispContractTag").innerText = `${state.symbol} ${state.strike} ${state.optionType.toUpperCase()}`;
+      document.getElementById("dispPositionBadge").innerText = `${state.isShort ? 'SHORT' : 'LONG'} (1 Lot / ${state.lotSize} Qty)`;
+      document.getElementById("dispPositionBadge").className = state.isShort ? 'badge badge-green' : 'badge badge-blue';
+
+      const bufferPts = state.spot - state.strike;
+      const bufferPct = (bufferPts / state.spot) * 100;
+      const isOtm = (state.optionType === 'call' && state.spot <= state.strike) || (state.optionType === 'put' && state.spot >= state.strike);
+      document.getElementById("dispBufferDesc").innerText = isOtm
+        ? `Spot is ₹${Math.abs(bufferPts).toFixed(2)} (${Math.abs(bufferPct).toFixed(2)}%) away from strike • Out-Of-The-Money (OTM)`
+        : `Spot is ₹${Math.abs(bufferPts).toFixed(2)} (${Math.abs(bufferPct).toFixed(2)}%) ITM • In-The-Money`;
+
+      document.getElementById("dispSpot").innerText = `₹${state.spot.toFixed(2)}`;
+      document.getElementById("dispLtp").innerText = `₹${state.ltp.toFixed(2)}`;
+      document.getElementById("dispEntry").innerText = `₹${state.price.toFixed(2)}`;
+
+      const pnl = state.isShort 
+        ? (state.price - state.ltp) * state.lotSize 
+        : (state.ltp - state.price) * state.lotSize;
+      const pnlEl = document.getElementById("dispPnl");
+      pnlEl.innerText = `${pnl >= 0 ? '+' : ''}₹${pnl.toFixed(2)}`;
+      pnlEl.style.color = pnl >= 0 ? '#34d399' : '#f87171';
+
+      // Labels
+      document.getElementById("strikeTxt").innerText = `₹${state.strike.toFixed(2)}`;
+      document.getElementById("spotTxt").innerText = `₹${state.spot.toFixed(2)}`;
+      document.getElementById("ivTxt").innerText = `${(state.iv * 100).toFixed(1)}%`;
+      document.getElementById("dteTxt").innerText = `${state.dte.toFixed(1)} days`;
+
+      // Hero Metrics
+      const powPct = (pow * 100).toFixed(2);
+      document.getElementById("powDisplay").innerText = `${powPct}%`;
+      document.getElementById("powBar").style.width = `${powPct}%`;
+      document.getElementById("powDesc").innerText = `${state.optionType.toUpperCase()} worthless if S_T ${state.optionType === 'call' ? '≤' : '≥'} ₹${state.strike.toFixed(2)}`;
+
+      const popPct = (pop * 100).toFixed(2);
+      document.getElementById("popDisplay").innerText = `${popPct}%`;
+      document.getElementById("popBar").style.width = `${popPct}%`;
+      document.getElementById("popDesc").innerText = `Breakeven: ₹${breakeven.toFixed(2)}`;
+
+      const potPct = (pot * 100).toFixed(2);
+      document.getElementById("potDisplay").innerText = `${potPct}%`;
+      document.getElementById("potBar").style.width = `${potPct}%`;
+
+      const dProxyPct = ((1.0 - Math.abs(delta)) * 100).toFixed(2);
+      document.getElementById("deltaProxyDisplay").innerText = `${dProxyPct}%`;
+      document.getElementById("deltaProxyBar").style.width = `${dProxyPct}%`;
+      document.getElementById("deltaProxyDesc").innerText = `Option Delta: ${delta > 0 ? '+' : ''}${delta.toFixed(3)}`;
+
+      // Greeks
+      document.getElementById("gDelta").innerText = `${delta > 0 ? '+' : ''}${delta.toFixed(4)}`;
+      document.getElementById("gGamma").innerText = gamma.toFixed(5);
+      document.getElementById("gThetaLot").innerText = `${thetaLot >= 0 ? '+' : ''}₹${thetaLot.toFixed(2)}/d`;
+      document.getElementById("gThetaLot").style.color = thetaLot >= 0 ? '#34d399' : '#f87171';
+      document.getElementById("gVega").innerText = `₹${vega.toFixed(4)}`;
+
+      const maxProfit = state.isShort ? state.price * state.lotSize : Infinity;
+      document.getElementById("dispMaxProfit").innerText = maxProfit === Infinity ? 'Unlimited' : `+₹${maxProfit.toFixed(2)}`;
+
+      lastBreakeven = breakeven;
+      renderScenarios(breakeven);
+      drawChart(breakeven);
+    }
+
+    function renderScenarios(breakeven) {
+      const tbody = document.getElementById("scenarioTableBody");
+      const moves = [0.05, 0.02, 0.0, -0.02, -0.05];
+      let html = "";
+
+      for (const m of moves) {
+        const sSpot = state.spot * (1.0 + m);
+        let intrinsic = 0;
+        if (state.optionType === 'call') intrinsic = Math.max(0, sSpot - state.strike);
+        else intrinsic = Math.max(0, state.strike - sSpot);
+
+        let pnl = state.isShort 
+          ? (state.price - intrinsic) * state.lotSize
+          : (intrinsic - state.price) * state.lotSize;
+
+        const isWorthless = intrinsic === 0;
+        const outcome = isWorthless 
+          ? (state.isShort ? '<span style="color:#34d399;font-weight:700;">Worthless (Max Profit)</span>' : '<span style="color:#f87171;">Worthless (Loss)</span>')
+          : (pnl >= 0 ? '<span style="color:#34d399;">ITM (In Profit)</span>' : '<span style="color:#f87171;">ITM (Loss)</span>');
+
+        html += `
+          <tr>
+            <td class="text-left font-bold" style="color: ${m > 0 ? '#34d399' : (m < 0 ? '#f87171' : '#fff')}">
+              ${m > 0 ? '+' : ''}${(m * 100).toFixed(0)}% ${m === 0 ? 'Current Spot' : (m > 0 ? 'Rally' : 'Drop')}
+            </td>
+            <td>₹${sSpot.toFixed(2)}</td>
+            <td>${m > 0 ? '+' : ''}${(m * 100).toFixed(1)}%</td>
+            <td>₹${intrinsic.toFixed(2)}</td>
+            <td style="color: ${pnl >= 0 ? '#34d399' : '#f87171'}; font-weight:700;">
+              ${pnl >= 0 ? '+' : ''}₹${pnl.toFixed(2)}
+            </td>
+            <td class="text-left">${outcome}</td>
+          </tr>
+        `;
+      }
+
+      // Add Breakeven row
+      html += `
+        <tr style="background: rgba(59, 130, 246, 0.1);">
+          <td class="text-left font-bold" style="color: #60a5fa;">Breakeven Level</td>
+          <td>₹${breakeven.toFixed(2)}</td>
+          <td>${(((breakeven - state.spot)/state.spot)*100).toFixed(1)}%</td>
+          <td>₹${Math.abs(breakeven - state.strike).toFixed(2)}</td>
+          <td style="font-weight:700; color:#fff;">₹0.00</td>
+          <td class="text-left"><span style="color:#60a5fa; font-weight:700;">Exact Breakeven</span></td>
+        </tr>
+      `;
+
+      tbody.innerHTML = html;
+    }
+
+    // ACCURATE CHART AXIS & DISTRIBUTION RENDERING (COLLISION-FREE)
+    let hoverX = null;
+    let lastBreakeven = 0;
+
+    // "Nice numbers" algorithm for clean, professional financial axis ticks
+    function getNiceTicks(minVal, maxVal, targetCount = 6) {
+      const span = maxVal - minVal;
+      if (span <= 0) return [Math.round(minVal)];
+      const roughStep = span / targetCount;
+      const stepPower = Math.pow(10, Math.floor(Math.log10(roughStep)));
+      const stepFraction = roughStep / stepPower;
+
+      let niceFraction = 1;
+      if (stepFraction > 7.5) niceFraction = 10;
+      else if (stepFraction > 3.5) niceFraction = 5;
+      else if (stepFraction > 1.5) niceFraction = 2;
+      else niceFraction = 1;
+
+      const step = niceFraction * stepPower;
+      const firstTick = Math.ceil(minVal / step) * step;
+      const lastTick = Math.floor(maxVal / step) * step;
+
+      const ticks = [];
+      for (let t = firstTick; t <= lastTick + 1e-5; t += step) {
+        ticks.push(Number(t.toFixed(2)));
+      }
+      return ticks;
+    }
+
+    function drawChart(breakeven) {
+      const canvas = document.getElementById("pdfCanvas");
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = rect.width || canvas.clientWidth || 600;
+      const height = rect.height || canvas.clientHeight || 340;
+
+      // Stable canvas sizing without resetting dimensions unnecessarily
+      const targetW = Math.round(width * dpr);
+      const targetH = Math.round(height * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      const t = Math.max(1e-5, state.dte / 365.0);
+      const v = Math.max(0.005, state.iv * Math.sqrt(t));
+
+      // Margins: ample room at top for tiered badges, room at bottom for round ticks
+      const chartLeft = width < 480 ? 40 : 55;
+      const chartRight = width < 480 ? width - 20 : width - 35;
+      const chartTop = 56;
+      const chartBottom = height - 38;
+      const chartW = chartRight - chartLeft;
+      const chartH = chartBottom - chartTop;
+
+      // Ensure price span encompasses Spot, Strike, Breakeven, and ±2.4 sigma log-normal distribution
+      const sLow = state.spot * Math.exp(-2.4 * v);
+      const sHigh = state.spot * Math.exp(2.4 * v);
+      const allPrices = [state.spot, state.strike, breakeven, sLow, sHigh];
+      const rawMin = Math.min(...allPrices);
+      const rawMax = Math.max(...allPrices);
+      const pad = (rawMax - rawMin) * 0.08;
+      let minPrice = Math.max(0.01, rawMin - pad);
+      let maxPrice = rawMax + pad;
+      const priceSpan = maxPrice - minPrice;
+
+      function pToX(p) { return chartLeft + ((p - minPrice) / priceSpan) * chartW; }
+      function xToP(x) { return minPrice + ((x - chartLeft) / chartW) * priceSpan; }
+
+      // Log-normal PDF
+      const mu = Math.log(state.spot) + (state.rate - 0.5 * state.iv * state.iv) * t;
+      function logPdf(p) {
+        if (p <= 0) return 0;
+        const diff = Math.log(p) - mu;
+        return (1.0 / (p * v * Math.sqrt(2 * Math.PI))) * Math.exp(-(diff * diff) / (2 * v * v));
+      }
+
+      // Generate 400 continuous sample points across chart width
+      const sampleCount = 400;
+      const pts = [];
+      let maxPdf = 0;
+      for (let i = 0; i <= sampleCount; i++) {
+        const x = chartLeft + (i / sampleCount) * chartW;
+        const p = xToP(x);
+        const pdfVal = logPdf(p);
+        if (pdfVal > maxPdf) maxPdf = pdfVal;
+        pts.push({ x, price: p, pdf: pdfVal });
+      }
+      if (maxPdf <= 0) maxPdf = 0.01;
+
+      // Leave 18% headroom between peak of curve and chartTop so curve never touches top badges
+      function valToY(pdfVal) {
+        return chartBottom - (pdfVal / (maxPdf * 1.20)) * chartH;
+      }
+
+      // 1. Draw Clean Grid Lines & Rounded Numerical X-Axis Ticks
+      const targetTicks = width < 480 ? 4 : 6;
+      const ticks = getNiceTicks(minPrice, maxPrice, targetTicks);
+
+      ctx.lineWidth = 1;
+      ctx.font = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace';
+      ctx.fillStyle = '#64748b';
+      ctx.textAlign = 'center';
+
+      for (const tick of ticks) {
+        const xPos = pToX(tick);
+        if (xPos < chartLeft + 8 || xPos > chartRight - 8) continue;
+
+        // Subtle vertical grid line
+        ctx.strokeStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.moveTo(xPos, chartTop);
+        ctx.lineTo(xPos, chartBottom);
+        ctx.stroke();
+
+        // Baseline tick pip
+        ctx.strokeStyle = '#334155';
+        ctx.beginPath();
+        ctx.moveTo(xPos, chartBottom);
+        ctx.lineTo(xPos, chartBottom + 4);
+        ctx.stroke();
+
+        // X-axis rounded price label
+        const formattedTick = tick >= 1000 ? `₹${Math.round(tick).toLocaleString('en-IN')}` : `₹${tick}`;
+        ctx.fillText(formattedTick, xPos, chartBottom + 16);
+      }
+
+      // Horizontal solid baseline
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(chartLeft, chartBottom);
+      ctx.lineTo(chartRight, chartBottom);
+      ctx.stroke();
+
+      // 2. Smooth Seamless Shading: Worthless (Green) & ITM (Red)
+      const strikeX = Math.max(chartLeft, Math.min(chartRight, pToX(state.strike)));
+
+      function fillRegion(xStart, xEnd, colorStart, colorEnd) {
+        if (xStart >= xEnd) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(xStart, chartBottom);
+
+        const yStart = valToY(logPdf(xToP(xStart)));
+        ctx.lineTo(xStart, yStart);
+
+        for (let i = 0; i < pts.length; i++) {
+          if (pts[i].x > xStart && pts[i].x < xEnd) {
+            ctx.lineTo(pts[i].x, valToY(pts[i].pdf));
+          }
+        }
+
+        const yEnd = valToY(logPdf(xToP(xEnd)));
+        ctx.lineTo(xEnd, yEnd);
+        ctx.lineTo(xEnd, chartBottom);
+        ctx.closePath();
+
+        const grad = ctx.createLinearGradient(0, chartTop, 0, chartBottom);
+        grad.addColorStop(0, colorStart);
+        grad.addColorStop(1, colorEnd);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      if (state.optionType === 'put') {
+        // PUT: Loss below Strike (Red), Worthless above Strike (Green)
+        fillRegion(chartLeft, strikeX, 'rgba(239, 68, 68, 0.32)', 'rgba(239, 68, 68, 0.03)');
+        fillRegion(strikeX, chartRight, 'rgba(16, 185, 129, 0.32)', 'rgba(16, 185, 129, 0.03)');
+      } else {
+        // CALL: Worthless below Strike (Green), Loss above Strike (Red)
+        fillRegion(chartLeft, strikeX, 'rgba(16, 185, 129, 0.32)', 'rgba(16, 185, 129, 0.03)');
+        fillRegion(strikeX, chartRight, 'rgba(239, 68, 68, 0.32)', 'rgba(239, 68, 68, 0.03)');
+      }
+
+      // 3. Draw Continuous Probability Distribution Curve Line
+      ctx.save();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const y = valToY(pts[i].pdf);
+        if (i === 0) ctx.moveTo(pts[i].x, y);
+        else ctx.lineTo(pts[i].x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      // 4. Smart Marker Layout Engine (Spot, Strike, Breakeven)
+      // Solves collision: Staggers overlapping markers across 3 distinct vertical tiers
+      const markers = [
+        {
+          id: 'spot',
+          name: 'Spot',
+          price: state.spot,
+          x: pToX(state.spot),
+          color: '#38bdf8',
+          icon: '📍',
+          dash: [5, 3]
+        },
+        {
+          id: 'strike',
+          name: 'Strike',
+          price: state.strike,
+          x: pToX(state.strike),
+          color: '#fbbf24',
+          icon: '🎯',
+          dash: [4, 4]
+        },
+        {
+          id: 'be',
+          name: 'B/E',
+          price: breakeven,
+          x: pToX(breakeven),
+          color: '#f43f5e',
+          icon: '⚡',
+          dash: [2, 3]
+        }
+      ];
+
+      // Sort markers left to right
+      const sortedM = [...markers].sort((a, b) => a.x - b.x);
+      const tiers = [[], [], []];
+      const minPillGap = 80;
+
+      for (const m of sortedM) {
+        let assigned = false;
+        for (let tIdx = 0; tIdx < 3; tIdx++) {
+          if (!tiers[tIdx].length || (m.x - tiers[tIdx][tiers[tIdx].length - 1].x >= minPillGap)) {
+            m.tier = tIdx;
+            tiers[tIdx].push(m);
+            assigned = true;
+            break;
+          }
+        }
+        if (!assigned) {
+          // If all tiers have something nearby, choose the one farthest away
+          let bestTier = 0;
+          let bestDist = -1;
+          for (let tIdx = 0; tIdx < 3; tIdx++) {
+            const d = m.x - tiers[tIdx][tiers[tIdx].length - 1].x;
+            if (d > bestDist) {
+              bestDist = d;
+              bestTier = tIdx;
+            }
+          }
+          m.tier = bestTier;
+          tiers[bestTier].push(m);
+        }
+      }
+
+      // Draw each marker
+      const tierY = [12, 28, 44]; // Y centers for tiers 0, 1, 2
+
+      for (const m of markers) {
+        if (m.x < chartLeft - 10 || m.x > chartRight + 10) continue;
+
+        // Vertical dashed line from top to bottom
+        ctx.save();
+        ctx.strokeStyle = m.color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash(m.dash);
+        ctx.beginPath();
+        ctx.moveTo(m.x, chartTop);
+        ctx.lineTo(m.x, chartBottom);
+        ctx.stroke();
+
+        // Baseline triangle anchor
+        ctx.setLineDash([]);
+        ctx.fillStyle = m.color;
+        ctx.beginPath();
+        ctx.moveTo(m.x, chartBottom);
+        ctx.lineTo(m.x - 3.5, chartBottom + 5);
+        ctx.lineTo(m.x + 3.5, chartBottom + 5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Top Pill Badge
+        const pY = tierY[m.tier];
+        const text = `${m.icon} ${m.name}: ₹${m.price.toFixed(2)}`;
+        ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace';
+        const txtW = ctx.measureText(text).width;
+        const pillW = txtW + 12;
+        const pillH = 16;
+        let pillX = m.x - pillW / 2;
+
+        // Keep pill inside chart left/right bounds
+        pillX = Math.max(chartLeft, Math.min(chartRight - pillW, pillX));
+
+        // Background pill
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+        ctx.strokeStyle = m.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const r = 3;
+        ctx.roundRect ? ctx.roundRect(pillX, pY - pillH / 2, pillW, pillH, r) : ctx.rect(pillX, pY - pillH / 2, pillW, pillH);
+        ctx.fill();
+        ctx.stroke();
+
+        // Text
+        ctx.fillStyle = m.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, pillX + pillW / 2, pY);
+
+        // Leader line connecting pill bottom to chartTop
+        ctx.strokeStyle = m.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(m.x, pY + pillH / 2);
+        ctx.lineTo(m.x, chartTop);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      // 5. Interactive Hover Crosshair & Glassmorphic Tooltip
+      if (hoverX !== null && hoverX >= chartLeft && hoverX <= chartRight) {
+        const hPrice = xToP(hoverX);
+        const hPdf = logPdf(hPrice);
+        const hY = valToY(hPdf);
+
+        ctx.save();
+        // Dot on curve
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(hoverX, hY, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Vertical hairline
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.setLineDash([2, 2]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(hoverX, chartTop);
+        ctx.lineTo(hoverX, chartBottom);
+        ctx.stroke();
+        ctx.restore();
+
+        // Tooltip Box
+        const isWorthless = (state.optionType === 'call' && hPrice <= state.strike) ||
+                            (state.optionType === 'put' && hPrice >= state.strike);
+
+        const diffFromSpot = ((hPrice - state.spot) / state.spot) * 100;
+        let intrinsic = 0;
+        if (state.optionType === 'call') intrinsic = Math.max(0, hPrice - state.strike);
+        else intrinsic = Math.max(0, state.strike - hPrice);
+
+        const tipW = 160;
+        const tipH = 50;
+        let tipX = hoverX > width - 180 ? hoverX - tipW - 12 : hoverX + 12;
+        let tipY = Math.max(chartTop + 5, Math.min(chartBottom - tipH - 5, hY - 25));
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(11, 17, 32, 0.95)';
+        ctx.strokeStyle = isWorthless ? '#10b981' : '#ef4444';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(tipX, tipY, tipW, tipH, 6);
+        else ctx.rect(tipX, tipY, tipW, tipH);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+
+        // Price & % from Spot
+        ctx.font = '700 11px monospace';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`₹${hPrice.toFixed(2)} (${diffFromSpot >= 0 ? '+' : ''}${diffFromSpot.toFixed(1)}%)`, tipX + 8, tipY + 8);
+
+        // Status & Outcome
+        ctx.font = '600 10px -apple-system, sans-serif';
+        if (isWorthless) {
+          ctx.fillStyle = '#34d399';
+          ctx.fillText(`✓ Worthless (Full Profit)`, tipX + 8, tipY + 24);
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '9px monospace';
+          ctx.fillText(`Max P&L: +₹${(state.price * state.lotSize).toFixed(0)}`, tipX + 8, tipY + 37);
+        } else {
+          ctx.fillStyle = '#f87171';
+          ctx.fillText(`✗ In-The-Money (ITM)`, tipX + 8, tipY + 24);
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '9px monospace';
+          const itmPnl = state.isShort 
+            ? (state.price - intrinsic) * state.lotSize 
+            : (intrinsic - state.price) * state.lotSize;
+          ctx.fillText(`P&L: ${itmPnl >= 0 ? '+' : ''}₹${itmPnl.toFixed(0)} (Int: ₹${intrinsic.toFixed(1)})`, tipX + 8, tipY + 37);
+        }
+        ctx.restore();
+      }
+    }
+
+    // Modal
+    function openTokenModal() {
+      document.getElementById("tokenInput").value = state.token || localStorage.getItem("upstox_token") || "";
+      document.getElementById("tokenModal").style.display = "flex";
+    }
+    function closeTokenModal() {
+      document.getElementById("tokenModal").style.display = "none";
+    }
+    function saveToken() {
+      const tok = document.getElementById("tokenInput").value.trim();
+      state.token = tok;
+      localStorage.setItem("upstox_token", tok);
+      closeTokenModal();
+      document.getElementById("tokenBadge").innerText = tok ? "Token Saved" : "No Token";
+      fetchLiveMarket();
+    }
+
+    // Init
+    window.addEventListener('load', () => {
+      const container = document.getElementById("chartContainer");
+      const canvas = document.getElementById("pdfCanvas");
+
+      container.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        hoverX = e.clientX - rect.left;
+        drawChart(lastBreakeven);
+      });
+      container.addEventListener("mouseleave", () => {
+        hoverX = null;
+        drawChart(lastBreakeven);
+      });
+      container.addEventListener("touchmove", (e) => {
+        if (e.touches && e.touches[0]) {
+          const rect = canvas.getBoundingClientRect();
+          hoverX = e.touches[0].clientX - rect.left;
+          drawChart(lastBreakeven);
+        }
+      }, { passive: true });
+      container.addEventListener("touchend", () => {
+        hoverX = null;
+        drawChart(lastBreakeven);
+      });
+      window.addEventListener("resize", () => recalc());
+
+      // Load token & recent trades
+      const stored = localStorage.getItem("upstox_token");
+      if (stored) state.token = stored;
+      renderRecentChips();
+
+      // Initial analysis
+      fetchLiveMarket();
+    });
+  </script>
+</body>
+</html>
